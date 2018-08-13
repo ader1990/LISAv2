@@ -7,7 +7,7 @@
             <Networking>Synthetic</Networking>
         </AdditionalHWConfig>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
-        <files>.\Testscripts\Linux\azuremodules.sh</files>
+        <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\perf_ntttcp.sh,.\Testscripts\Linux\run-ntttcp-and-tcping.sh,.\Testscripts\Linux\report-ntttcp-and-tcping.sh</files>
         <TestParameters>
             <param>testDuration=300</param>
             <param>testConnections="1 2 4 8 16 32 64 128 256 512 1024 2048 4096 6144 8192 10240"</param>
@@ -16,7 +16,6 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>tcp,network,hv_netvsc</Tags>
-        <TestID>Perf_Network_001</TestID>
     </test>
     <test>
         <testName>PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-SRIOV</testName>
@@ -25,7 +24,7 @@
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
         </AdditionalHWConfig>
-        <files>.\Testscripts\Linux\azuremodules.sh</files>
+        <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\perf_ntttcp.sh,.\Testscripts\Linux\run-ntttcp-and-tcping.sh,.\Testscripts\Linux\report-ntttcp-and-tcping.sh</files>
         <TestParameters>
             <param>testDuration=300</param>
             <param>testConnections="1 2 4 8 16 32 64 128 256 512 1024 2048 4096 6144 8192 10240"</param>
@@ -34,7 +33,6 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>tcp,network,hv_netvsc,sriov</Tags>
-        <TestID>Perf_Network_002</TestID>
     </test>
     <test>
         <testName>PERF-NETWORK-TCP-LATENCY-MULTICONNECTION-Synthetic</testName>
@@ -48,7 +46,6 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>tcp,network,hv_netvsc</Tags>
-        <TestID>Perf_Network_003</TestID>
     </test>
     <test>
         <testName>PERF-NETWORK-TCP-LATENCY-MULTICONNECTION-SRIOV</testName>
@@ -56,7 +53,7 @@
         <setupType>M1S1</setupType>
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
-        </AdditionalHWConfig>        
+        </AdditionalHWConfig>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
         <files>.\Testscripts\Linux\azuremodules.sh</files>
         <TestParameters>
@@ -66,8 +63,7 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>tcp,network,hv_netvsc,sriov</Tags>
-        <TestID>Perf_Network_004</TestID>
-    </test>    
+    </test>
     <test>
         <testName>PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-Synthetic</testName>
         <testScript>PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-IPERF3.ps1</testScript>
@@ -86,16 +82,14 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>udp,network,hv_netvsc</Tags>
-        <TestID>Perf_Network_005</TestID>
     </test>
     <test>
         <testName>PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-SRIOV</testName>
-        <testScript></testScript>
         <testScript>PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-IPERF3.ps1</testScript>
         <setupType>M1S1</setupType>
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
-        </AdditionalHWConfig>        
+        </AdditionalHWConfig>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
         <files>.\Testscripts\Linux\azuremodules.sh</files>
         <TestParameters>
@@ -110,14 +104,13 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>udp,network,hv_netvsc,sriov</Tags>
-        <TestID>Perf_Network_006</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-4K-IO</testName>
         <testScript>PERF-STORAGE-MULTIDISK-RAID0-FIO.ps1</testScript>
         <setupType>DS14DISK12</setupType>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
-        <files>.\Testscripts\Linux\azuremodules.sh</files>
+        <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\perf_fio.sh,.\Testscripts\Linux\fio_jason_parser.sh,.\Testscripts\Linux\JSON.awk,.\Tools\gawk</files>
         <TestParameters>
             <param>modes='randread randwrite read write'</param>
             <param>startThread=1</param>
@@ -132,14 +125,13 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_001</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-1024K-IO</testName>
         <testScript>PERF-STORAGE-MULTIDISK-RAID0-FIO.ps1</testScript>
         <setupType>DS14DISK12</setupType>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
-        <files>.\Testscripts\Linux\azuremodules.sh</files>
+        <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\perf_fio.sh,.\Testscripts\Linux\fio_jason_parser.sh,.\Testscripts\Linux\JSON.awk,.\Tools\gawk</files>
         <TestParameters>
             <param>modes='randread randwrite read write'</param>
             <param>startThread=1</param>
@@ -154,7 +146,6 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_002</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K</testName>
@@ -177,7 +168,6 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_003</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K</testName>
@@ -200,7 +190,6 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_003</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K</testName>
@@ -208,7 +197,7 @@
         <setupType>DS14DISK12NFS</setupType>
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
-        </AdditionalHWConfig>         
+        </AdditionalHWConfig>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
         <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\fio_jason_parser.sh,.\Testscripts\Linux\JSON.awk,.\Testscripts\Linux\perf_fio_nfs.sh,.\Testscripts\Linux\CreateRaid.sh</files>
         <TestParameters>
@@ -226,7 +215,6 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_003</TestID>
     </test>
     <test>
         <testName>PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K</testName>
@@ -234,7 +222,7 @@
         <setupType>DS14DISK12NFS</setupType>
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
-        </AdditionalHWConfig>         
+        </AdditionalHWConfig>
         <SubtestValues>This-tag-will-be-removed</SubtestValues>
         <files>.\Testscripts\Linux\azuremodules.sh,.\Testscripts\Linux\fio_jason_parser.sh,.\Testscripts\Linux\JSON.awk,.\Testscripts\Linux\perf_fio_nfs.sh,.\Testscripts\Linux\CreateRaid.sh</files>
         <TestParameters>
@@ -252,7 +240,6 @@
         <Category>Performance</Category>
         <Area>Storage</Area>
         <Tags>hv_storvsc,storage</Tags>
-        <TestID>Perf_Storage_003</TestID>
     </test>
     <test>
         <testName>PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-Synthetic</testName>
@@ -260,7 +247,7 @@
         <setupType>M1S1</setupType>
         <AdditionalHWConfig>
             <Networking>Synthetic</Networking>
-        </AdditionalHWConfig>         
+        </AdditionalHWConfig>
         <files></files>
         <TestParameters>
             <param>testDuration=120</param>
@@ -281,7 +268,7 @@
         <setupType>M1S1</setupType>
         <AdditionalHWConfig>
             <Networking>SRIOV</Networking>
-        </AdditionalHWConfig>         
+        </AdditionalHWConfig>
         <files></files>
         <TestParameters>
             <param>testDuration=120</param>
@@ -295,5 +282,5 @@
         <Category>Performance</Category>
         <Area>Network</Area>
         <Tags>hv_netvsc,network,tcp,sriov</Tags>
-    </test>    
+    </test>
 </TestCases>

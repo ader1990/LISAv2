@@ -8,11 +8,10 @@
         <Category>Smoke</Category>
         <Area>default</Area>
         <Tags>bvt</Tags>
-        <TestID>Smoke_001</TestID>
     </test>
     <test>
         <TestName>VERIFY-DEPLOYMENT-PROVISION-SRIOV</TestName>
-        <PowershellScript>BVT-VERIFY-DEPLOYMENT-PROVISION.ps1</PowershellScript>
+        <testScript>BVT-VERIFY-DEPLOYMENT-PROVISION.ps1</testScript>
         <files></files>
         <setupType>SingleVM</setupType>
         <OverrideVMSize>Standard_D13_v2</OverrideVMSize>
@@ -23,7 +22,6 @@
         <Category>Smoke</Category>
         <Area>default</Area>
         <Tags>bvt</Tags>
-        <TestID>Smoke_001</TestID>
     </test>
     <test>
         <TestName>VERIFY-HOSTNAME</TestName>
@@ -37,7 +35,6 @@
         <Category>Smoke</Category>
         <Area>default</Area>
         <Tags>bvt,wala</Tags>
-        <TestID>Smoke_002</TestID>
     </test>
     <test>
         <TestName>VERIFY-ROOT-PASSWORD-DELETED</TestName>
@@ -48,6 +45,5 @@
         <Category>Smoke</Category>
         <Area>default</Area>
         <Tags>bvt</Tags>
-        <TestID>Smoke_003</TestID>
     </test>
 </TestCases>

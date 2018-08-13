@@ -11,6 +11,22 @@
         <Category>Stress</Category>
         <Area>stress</Area>
         <Tags>stress,boot</Tags>
-        <TestID>AzureStress_001</TestID>
+    </test>
+    <test>
+        <testName>STRESSTEST-VERIFY-RESTART-MAX-SRIOV-NICS</testName>
+        <testScript></testScript>
+        <PowershellScript>STRESSTEST-VERIFY-RESTART.ps1</PowershellScript>
+        <files></files>
+        <setupType>SingleVMMaxNetwork</setupType>
+        <AdditionalHWConfig>
+            <Networking>SRIOV</Networking>
+        </AdditionalHWConfig>
+        <TestParameters>
+            <param>rebootNumber=3</param>
+        </TestParameters>
+        <Platform>Azure</Platform>
+        <Category>Stress</Category>
+        <Area>stress</Area>
+        <Tags>stress,boot,network,sriov</Tags>
     </test>
 </TestCases>

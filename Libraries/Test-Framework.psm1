@@ -78,7 +78,7 @@ function Run-SetupScript {
         [string]$SSHPort,
         [string]$Username,
         [string]$Password,
-        [string]$TestID
+        [string]$TestName
     )
 
     $workDir = Get-Location
@@ -198,24 +198,37 @@ function Collect-TestLogs {
         [string]$TestType,
         [string]$TestName
     )
-    # Note (mbivolan): This is a temporary solution until a standard is decided
+    # Note: This is a temporary solution until a standard is decided
     # for what string py/sh scripts return
-    $resultTranslation = @{ "TestAborted" = "Aborted"; "TestFailed" = "FAIL"; "TestCompleted" = "PASS" }
+    $resultTranslation = @{ "TestAborted" = "Aborted";
+                            "TestFailed" = "FAIL";
+                            "TestCompleted" = "PASS"
+                          }
 
     if ($TestType -eq "sh") {
+        $filesTocopy = "{0}/state.txt, {0}/summary.log, {0}/TestExecution.log, {0}/TestExecutionError.log" `
+            -f @("/home/${Username}")
         RemoteCopy -download -downloadFrom $PublicIP -downloadTo $LogsDestination `
              -Port $SSHPort -Username "root" -password $Password `
-             -files "/home/${Username}/state.txt, /home/${Username}/${TestName}_summary.log"
-        $statePath = Join-Path $LogDir "state.txt"
-        $testResult += $(Get-Content $statePath)
-        $testResult = $resultTranslation[$testResult]
+             -files $filesTocopy
+        $summary = Get-Content (Join-Path $LogDir "summary.log")
+        $testState = Get-Content (Join-Path $LogDir "state.txt")
+        $testResult = $resultTranslation[$testState]
     } elseif ($TestType -eq "py") {
+        $filesTocopy = "{0}/state.txt, {0}/Summary.log, {0}/${TestName}_summary.log" `
+            -f @("/home/${Username}")
         RemoteCopy -download -downloadFrom $PublicIP -downloadTo $LogsDestination `
              -Port $SSHPort -Username "root" -password $Password `
-             -files "/home/${Username}/state.txt, /home/${Username}/Summary.log, /home/${Username}/${TestName}_summary.log"
-        $statePath = Join-Path $LogDir "Summary.log"
-        $testResult += $(Get-Content $statePath)
+             -files $filesTocopy
+        $summary = Get-Content (Join-Path $LogDir "Summary.log")
+        $testResult = $summary
     }
+
+    LogMsg "TEST SCRIPT SUMMARY ~~~~~~~~~~~~~~~"
+    $summary | ForEach-Object {
+        Write-Host $_ -ForegroundColor Gray -BackgroundColor White
+    }
+    LogMsg "END OF TEST SCRIPT SUMMARY ~~~~~~~~~~~~~~~"
 
     return $testResult
 }
@@ -370,7 +383,7 @@ function Run-Test {
         (the shell/python scripts will be executed remotely).
         Downloads logs for created by shell/python test scripts.
     - Test resource cleanup step:
-        Removes deployed resources depending on the test result and paramters.
+        Removes deployed resources depending on the test result and parameters.
 
     .PARAMETER CurrentTestData
         Test definition xml structure.
@@ -427,7 +440,7 @@ function Run-Test {
     }
 
     if ($DeployVMPerEachTest -or $ExecuteSetup) {
-        # Note (mbivolan): This method will create $AllVMData global variable
+        # Note: This method will create $AllVMData global variable
         $isDeployed = DeployVMS -setupType $CurrentTestData.setupType `
              -Distro $Distro -XMLConfig $XmlConfig
         Enable-RootUser -RootPassword $VMPassword -VMData $AllVMData `
@@ -456,7 +469,7 @@ function Run-Test {
     if ($testPlatform -eq "Hyperv" -and $CurrentTestData.SetupScript) {
         $setupResult = Run-SetupScript -Script $CurrentTestData.SetupScript `
              -Parameters $testParameters -VMData $AllVMData `
-             -TestID $CurrentTestData.TestID
+             -TestName $CurrentTestData.TestName
     }
 
     if ($CurrentTestData.files) {
