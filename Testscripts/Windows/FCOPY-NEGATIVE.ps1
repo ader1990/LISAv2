@@ -99,13 +99,6 @@ if (-not (Test-Path $rootDir)) {
 }
 cd $rootDir
 
-# Source TCUtils.ps1
-if (Test-Path ".\testscripts\Windows\TCUtils.ps1") {
-    . .\testscripts\Windows\TCUtils.ps1
-} else {
-   LogErr "Error: Could not find setupScripts\TCUtils.ps1"
-}
-
 # If host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0){
@@ -117,7 +110,7 @@ elseif ($BuildNumber -lt 9600){
 }
 
 # If vm does not support systemd, skip test.
-$sts = CheckSystemd
+$sts = Check-Systemd
 if ($sts[-1] -eq $false){
     LogMsg "Distro does not support systemd, skipping test."
     return "Skipped"
@@ -262,6 +255,8 @@ if ($? -ne "True") {
 }
 
 return "PASSED"
+}
+
 }
 
 Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `

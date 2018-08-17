@@ -94,14 +94,11 @@ foreach ($p in $params) {
     }
 }
 
-#
-# Change the working directory for the log files
-# Delete any previous summary.log file, then create a new one
-#
 if (-not (Test-Path $rootDir)) {
     "Error: The directory `"${rootDir}`" does not exist"
     return $retVal
-
+}
+cd $rootDir
 # if host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0)
@@ -248,3 +245,9 @@ if (-not $?) {
 }
 
 return $retVal
+}
+
+Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `
+         -ipv4 $AllVMData.PublicIP -vmPort $AllVMData.SSHPort `
+         -vmUserName $user -vmPassword $password -rootDir $WorkingDirectory `
+         -testParams $testParams

@@ -2592,7 +2592,7 @@ function GetHostBuildNumber($hvServer)
         return 0
     }
 }
-function CheckFile($vmPassword,$vmPort,$vmUserName,$ipv4,[string] $fileName, [boolean] $checkSize = $False , [boolean] $checkContent = $False )
+function CheckFile([string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4,[string] $fileName, [boolean] $checkSize = $False , [boolean] $checkContent = $False )
 {    <#
     .Synopsis
          Checks if test file is present or not
@@ -2611,7 +2611,6 @@ function CheckFile($vmPassword,$vmPort,$vmUserName,$ipv4,[string] $fileName, [bo
         return $False
     }
     if ($checkContent) {
-        .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "dos2unix ${fileName} >/dev/null 2>&1"
         .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "cat ${fileName}"
         if (-not $?) {
             return $False
@@ -2619,7 +2618,7 @@ function CheckFile($vmPassword,$vmPort,$vmUserName,$ipv4,[string] $fileName, [bo
     }
     return  $True
 }
-function SendCommandToVM($vmPassword,$vmPort,$ipv4, [string] $command)
+function SendCommandToVM([string] $vmPassword,[string] $vmPort,[string] $ipv4, [string] $command)
 {
     <#
     .Synopsis
@@ -2667,7 +2666,7 @@ function SendCommandToVM($vmPassword,$vmPort,$ipv4, [string] $command)
 
     return $retVal
 }
-function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
+function RunRemoteScript([string] $remoteScript,[string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4,[String] $params)
    <#
     .Synopsis
         Run script file  on  Linux VM using SSH.
@@ -2834,7 +2833,7 @@ function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
     del runtest_${ipv4}.sh -ErrorAction "SilentlyContinue"
     return $retValue
 }
-function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
+function check_fcopy_daemon([string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4)
   <#
     .Synopsis
      Verifies that the fcopy_daemon 
@@ -2851,7 +2850,7 @@ function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
         return $False
     }
 
-    .\Tools\pscp.exe -C -pw $vmPassword -P $vmPort $vmUserName@${ipv4}:/tmp/fcopy_present .
+    .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} $vmUserName@${ipv4}:/tmp/fcopy_present .
     if (-not $?) {
 		LogErr "ERROR: Unable to copy the confirmation file from the VM"
 		return $False
@@ -2866,7 +2865,7 @@ function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
     del $filename
     return $retValue
 }
-function check_file($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile)
+function check_file( [string] $vmPassword, [string] $vmPort,[string] $vmUserName,[string] $ipv4,[String] $testfile)
  <#
     .Synopsis
     Checks files on VM 
@@ -2882,7 +2881,7 @@ function check_file($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile)
     }
 	return $True
 }
-function mount_disk($vmPassword,$vmPort,$vmUserName,$ipv4)
+function mount_disk([string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4)
  <#
     .Synopsis
      Mounts  and formates to ext3 a disk on vm  
@@ -2922,7 +2921,7 @@ function mount_disk($vmPassword,$vmPort,$vmUserName,$ipv4)
     LogMsg "Info: $driveName has been mounted to /mnt in the VM $vmName."
     return $True
 }
-function remove_file_vm($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile)
+function remove_file_vm([string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4,[String] $testfile)
  <#
     .Synopsis
      Removes testfile from VM   using SendCommandToVM function
@@ -2938,7 +2937,7 @@ function remove_file_vm($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile
     }
     return $True
 }
-function copy_file_vm($vmName,$hvServer,[String] $filePath)
+function copy_file_vm([string] $vmName,[string] $hvServer,[String] $filePath)
  <#
     .Synopsis
      Copy the file to the Linux guest VM
@@ -2974,7 +2973,7 @@ function check_file_vm($vmName,[String] $testfile,[String] $originalFileSize , [
     }
     return $True
 }
-function RemoveTestFile($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $pathToFile,[String] $testfile)
+function RemoveTestFile([string] $vmPassword,[string] $vmPort,[string] $vmUserName,[string] $ipv4,[String] $pathToFile,[String] $testfile)
 <#
     .Synopsis
      Delete temporary test file
@@ -3004,7 +3003,7 @@ function check_file_vm($vmName,[String] $testfile,[String] $originalFileSize , [
         return "FAILED"
     }
 }
-function Check-Systemd($vmPassword,$vmPort,$vmUserName,$ipv4)
+function Check-Systemd([string] $vmPassword, [string]$vmPort,[string] $vmUserName, [string] $ipv4)
 {
     $check1 = $true
     $check2 = $true

@@ -196,7 +196,7 @@ if (-not $sts[-1]) {
 }
 
 # Removing previous test files on the VM
-.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "rm -f /tmp/testfile-*"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "rm -rf /tmp/testfile-*"
 
 # If we got here then all checks have passed and we can copy the file to the Linux guest VM
 # Initial file copy, which must be successful
