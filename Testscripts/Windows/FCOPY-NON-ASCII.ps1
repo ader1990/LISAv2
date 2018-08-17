@@ -46,17 +46,6 @@ function Main {
 
 $retVal = $false
 
-#######################################################################
-# Delete temporary test file
-#######################################################################
-function RemoveTestFile()
-{
-    Remove-Item -Path $pathToFile -Force
-    if ($? -ne "True") {
-        LogErr "Error: cannot remove the test file '${testfile}'!" 
-        return "FAILED"
-    }
-}
 
 #######################################################################
 #
@@ -303,7 +292,7 @@ if ( -not $MD5IsMatching) {
     return "FAILED"
 }
 
-Write-Output "Info: MD5 checksums are matching between the host-side and guest VM file." 
+LogMsg "Info: MD5 checksums are matching between the host-side and guest VM file." 
 
 # Removing the temporary test file
 Remove-Item -Path \\$hvServer\$file_path_formatted -Force

@@ -47,62 +47,6 @@ function Main {
     )
 
 
-function Mount-Disk()
-{
-
-    $driveName = "/dev/sdb"
-
-    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo d;echo;echo w)|fdisk ${driveName}"
-    if (-not $sts) {
-        LogErr "ERROR: Failed to format the disk in the VM $vmName."
-        return "FAILED"
-    }
-
-    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo n;echo p;echo 1;echo;echo;echo w)|fdisk ${driveName}"
-    if (-not $sts) {
-        LogErr "ERROR: Failed to format the disk in the VM $vmName."
-        return "FAILED"
-    }
-
-    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mkfs.ext4 ${driveName}1"
-    if (-not $sts) {
-        LogErr "ERROR: Failed to make file system in the VM $vmName."
-        return "FAILED"
-    }
-
-    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mount ${driveName}1 /mnt"
-    if (-not $sts) {
-        LogErr "ERROR: Failed to mount the disk in the VM $vmName."
-        return "FAILED"
-    }
-
-    LogMsg "Info: $driveName has been mounted to /mnt in the VM $vmName."
-
-    return "PASSED"
-}
-
-function Check-Systemd()
-{
-    $check1 = $true
-    $check2 = $true
-    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ls -l /sbin/init | grep systemd"
-    if ($? -ne "True"){
-       LogMsg "Systemd not found on VM"
-        $check1 = $false
-    }
-
-    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "systemd-analyze --help"
-    if ($? -ne "True"){
-        LogMsg "Systemd-analyze not present on VM."
-        $check2 = $false
-    }
-
-    if (($check1 -and $check2) -eq $true) {
-        return "PASSED"
-    } else {
-        return "FAILED"
-    }
-}
 
 # Read parameters
 $params = $testParams.TrimEnd(";").Split(";")

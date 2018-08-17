@@ -121,7 +121,7 @@ $retVal = "PASSED"
 #
 # Verify if the Guest services are enabled for this VM
 #
-$$gsi = Get-VMIntegrationService -vmName $vmName -ComputerName $hvServer -Name "Guest Service Interface"
+$gsi = Get-VMIntegrationService -vmName $vmName -ComputerName $hvServer -Name "Guest Service Interface"
 if (-not $gsi) {
     LogErr "Error: Unable to retrieve Integration Service status from VM '${vmName}'" 
     return "Aborted"

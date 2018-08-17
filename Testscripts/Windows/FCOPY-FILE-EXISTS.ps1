@@ -115,9 +115,8 @@ elseif ($BuildNumber -lt 9600)
     return "PASSED"
 }
 
-
-LogMsg "This script covers test case: ${TC_COVERED}" 
 $retVal = "PASSED"
+
 
 #
 # Verify if the Guest services are enabled for this VM

@@ -2828,31 +2828,6 @@ function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
     return $retValue
 }
 
-function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
-{
-    $filename = ".\fcopy_present"
-
-    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@$ipv4 "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
-    if (-not $?) {
-       LogErr  "ERROR: Unable to verify if the fcopy daemon is running"
-        return $False
-    }
-
-    .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} $vmUserName@$ipv4:/tmp/fcopy_present .
-    if (-not $?) {
-		LogErr  "ERROR: Unable to copy the confirmation file from the VM"
-        return $False
-    }
-
-    # When using grep on the process in file, it will return 1 line if the daemon is running
-    if ((Get-Content $filename  | Measure-Object -Line).Lines -eq  "1" ) {
-        LogMsg "Info: hv_fcopy_daemon process is running."
-        $retValue = $True
-    }
-
-    del $filename
-    return $retValue
-}
 function CreateTestResultObject()
 {
 	$objNode = New-Object -TypeName PSObject
