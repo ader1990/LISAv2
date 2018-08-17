@@ -25,35 +25,22 @@
 .Description
     The script will copy a random generated 2GB file multiple times from a Windows host to
     the Linux VM, and then checks if the size is matching.
-    A typical XML definition for this test case would look similar
-    to the following:
-       <test>
-		<testName>FCOPY_repeat</testName>
-		<setupScript>setupScripts\Add-VHDXForResize.ps1</setupScript>
-		<testScript>setupscripts\FCOPY_repeated_delete.ps1</testScript>
-		<cleanupScript>SetupScripts\Remove-VHDXHardDisk.ps1</cleanupScript>
-		<timeout>1200</timeout>
-		<testParams>
-			<param>TC_COVERED=FCopy-06</param>
-                	<param>Type=Fixed</param>
-        		<param>SectorSize=512</param>
-                	<param>DefaultSize=3GB</param>
-			<param>FileSize=2GB</param>
-		</testParams>
-		<noReboot>False</noReboot>
-	</test>
-    NOTE: Make sure DefaultSize is equal or bigger than FileSize.
-.Parameter vmName
-    Name of the VM to test.
-.Parameter hvServer
-    Name of the Hyper-V server hosting the VM.
-.Parameter testParams
-    Test data for this test case.
-.Example
-    setupScripts\FCOPY_repeated_delete.ps1 -vmName NameOfVm -hvServer localhost -testParams 'sshKey=path/to/ssh;ipv4=ipaddress;FileSize=2GB'
+
 #>
 
-param([string] $vmName, [string] $hvServer, [string] $testParams)
+param([String] $TestParams)
+
+function Main {
+    param (
+        $VMName,
+        $HvServer,
+        $Ipv4,
+        $VMPort,
+        $VMUserName,
+        $VMPassword,
+        $RootDir,
+        $TestParams
+    )
 
 $testfile = $null
 $gsi = $null
@@ -65,31 +52,30 @@ $gsi = $null
 #######################################################################
 function check_fcopy_daemon()
 {
-    $filename = ".\fcopy_present"
+	$filename = ".\fcopy_present"
 
-    .\bin\plink -i ssh\${sshKey} root@${ipv4} "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
     if (-not $?) {
-        Write-Error -Message  "ERROR: Unable to verify if the fcopy daemon is running" -ErrorAction SilentlyContinue
-        Write-Output "ERROR: Unable to verify if the fcopy daemon is running"
-        return $False
+        LogErr  "ERROR: Unable to verify if the fcopy daemon is running" 
+        return "ABORTED"
     }
 
-    .\bin\pscp -i ssh\${sshKey} root@${ipv4}:/tmp/fcopy_present .
+    .\Tools\pscp.exe -C -pw $vmPassword -P $vmPort $vmUserName@${ipv4}:/tmp/fcopy_present .
     if (-not $?) {
-        Write-Error -Message "ERROR: Unable to copy the confirmation file from the VM" -ErrorAction SilentlyContinue
-        Write-Output "ERROR: Unable to copy the confirmation file from the VM"
-        return $False
+		LogErr "ERROR: Unable to copy the confirmation file from the VM"
+		return "ABORTED"
     }
 
     # When using grep on the process in file, it will return 1 line if the daemon is running
     if ((Get-Content $filename  | Measure-Object -Line).Lines -eq  "1" ) {
-        Write-Output "Info: hv_fcopy_daemon process is running."
-        $retValue = $True
+		Write-Output "Info: hv_fcopy_daemon process is running."
+		$retValue = "PASSED"
     }
 
     del $filename
     return $retValue
 }
+
 
 #######################################################################
 #
@@ -98,12 +84,12 @@ function check_fcopy_daemon()
 #######################################################################
 function check_file([String] $testfile)
 {
-    .\bin\plink -i ssh\${sshKey} root@${ipv4} "wc -c < /mnt/$testfile"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "wc -c < /tmp/$testfile"
     if (-not $?) {
-        Write-Output "ERROR: Unable to read file /mnt/$testfile." -ErrorAction SilentlyContinue
-        return $False
+        LogErr "ERROR: Unable to read file" 
+        return "FAILED"
     }
-    return $True
+	return "PASSED"
 }
 
 #######################################################################
@@ -113,36 +99,36 @@ function check_file([String] $testfile)
 #######################################################################
 function mount_disk()
 {
-    . .\setupScripts\TCUtils.ps1
+    . .\testscripts\Windows\TCUtils.ps1
 
     $driveName = "/dev/sdb"
 
-    $sts = SendCommandToVM $ipv4 $sshKey "(echo d;echo;echo w)|fdisk ${driveName}"
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo d;echo;echo w)|fdisk ${driveName}"
     if (-not $sts) {
-        Write-Output "ERROR: Failed to format the disk in the VM $vmName." | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "ERROR: Failed to format the disk in the VM $vmName." 
+        return "Failed"
     }
 
-    $sts = SendCommandToVM $ipv4 $sshKey "(echo n;echo p;echo 1;echo;echo;echo w)|fdisk ${driveName}" | Tee-Object -Append -file $summaryLog
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo n;echo p;echo 1;echo;echo;echo w)|fdisk ${driveName}" 
     if (-not $sts) {
-        Write-Output "ERROR: Failed to format the disk in the VM $vmName."
-        return $False
+        LogErr "ERROR: Failed to format the disk in the VM $vmName."
+        return "Failed"
     }
 
-    $sts = SendCommandToVM $ipv4 $sshKey "mkfs.ext3 ${driveName}1"
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mkfs.ext3 ${driveName}1"
     if (-not $sts) {
-        Write-Output "ERROR: Failed to make file system in the VM $vmName." | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "ERROR: Failed to make file system in the VM $vmName." 
+        return "Failed"
     }
 
-    $sts = SendCommandToVM $ipv4 $sshKey "mount ${driveName}1 /mnt"
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mount ${driveName}1 /mnt"
     if (-not $sts) {
-        Write-Output "ERROR: Failed to mount the disk in the VM $vmName." | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "ERROR: Failed to mount the disk in the VM $vmName." 
+        return "Failed"
     }
 
-    "Info: $driveName has been mounted to /mnt in the VM $vmName."
-    return $True
+    LogMsg "Info: $driveName has been mounted to /mnt in the VM $vmName."
+    return "PASSED"
 }
 
 #################################################################
@@ -151,12 +137,12 @@ function mount_disk()
 #
 #################################################################
 function remove_file_vm(){
-    . .\setupScripts\TCUtils.ps1
-    $sts = SendCommandToVM $ipv4 $sshKey "rm -f /mnt/$testfile"
+    . .\testscripts\Windows\TCUtils.ps1
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "rm -f /mnt/$testfile"
     if (-not $sts) {
-        return $False
+        return "FAILED"
     }
-    return $True
+    return "PASSED"
 }
 
 ################################################################
@@ -168,9 +154,9 @@ function copy_file_vm(){
     $Error.Clear()
     Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/mnt/" -FileSource host -ErrorAction SilentlyContinue
     if ($Error.Count -ne 0) {
-        return $False
+        return "FAILED"
     }
-    return $True
+    return "PASSED"
 }
 
 ####################################################################################
@@ -181,14 +167,14 @@ function copy_file_vm(){
 function check_file_vm(){
     $sts = check_file $testfile
     if (-not $sts[-1]) {
-        Write-Output "ERROR: File is not present on the guest VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "ERROR: File is not present on the guest VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
+        return "FAILED"
     }
     elseif ($sts[0] -ne $fileSize) {
-        Write-Output "ERROR: The file copied doesn't match the ${originalFileSize} size!" | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "ERROR: The file copied doesn't match the ${originalFileSize} size!" | Tee-Object -Append -file $summaryLog
+        return "FAILED"
     }
-    return $True
+    return "PASSED"
 }
 
 #######################################################################
@@ -231,9 +217,6 @@ foreach ($p in $params) {
     if ($fields[0].Trim() -eq "ipv4") {
         $IPv4 = $fields[1].Trim()
     }
-    if ($fields[0].Trim() -eq "sshkey") {
-        $sshkey = $fields[1].Trim()
-    }
     if ($fields[0].Trim() -eq "FileSize") {
         $fileSize = $fields[1].Trim()
     }
@@ -244,34 +227,31 @@ foreach ($p in $params) {
 # Delete any previous summary.log file, then create a new one
 #
 if (-not (Test-Path $rootDir)) {
-    "Error: The directory `"${rootDir}`" does not exist"
+   LogErr "Error: The directory `"${rootDir}`" does not exist"
     return $retVal
 }
 cd $rootDir
 
 # Source TCUtils.ps1
-if (Test-Path ".\setupScripts\TCUtils.ps1") {
-    . .\setupScripts\TCUtils.ps1
+if (Test-Path ".\testscripts\Windows\TCUtils.ps1") {
+    . .\testscripts\Windows\TCUtils.ps1
 } else {
-    "Error: Could not find setupScripts\TCUtils.ps1"
+   LogErr "Error: Could not find setupScripts\TCUtils.ps1"
 }
 
 # if host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0)
 {
-    return $false
+    return "FAILED"
 }
 elseif ($BuildNumber -lt 9600)
 {
-    return $Skipped
+    return "Skipped"
 }
 # Delete any previous summary.log file, then create a new one
-$summaryLog = "${vmName}_summary.log"
-del $summaryLog -ErrorAction SilentlyContinue
-Write-Output "This script covers test case: ${TC_COVERED}" | Tee-Object -Append -file $summaryLog
-
-$retVal = $True
+LogMsg "This script covers test case: ${TC_COVERED}" 
+$retVal = "PASSED"
 
 #
 # Verify if the Guest services are enabled for this VM
@@ -281,30 +261,31 @@ $fileSize = $fileSize/1
 
 $gsi = Get-VMIntegrationService -vmName $vmName -ComputerName $hvServer -Name "Guest Service Interface"
 if (-not $gsi) {
-    "Error: Unable to retrieve Integration Service status from VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    return $False
+    LogErr "Error: Unable to retrieve Integration Service status from VM '${vmName}'" 
+    return "Aborted"
 }
 
 if (-not $gsi.Enabled) {
-    "Warning: The Guest services are not enabled for VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    if ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
-        Stop-VM -ComputerName $hvServer -Name $vmName -Force -Confirm:$false
-    }
+    LogMsg "Warning: The Guest services are not enabled for VM '${vmName}'" 
+	if ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+		Stop-VM -ComputerName $hvServer -Name $vmName -Force -Confirm:$false
+	}
 
-    # Waiting until the VM is off
-    while ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+	# Waiting until the VM is off
+	while ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+        LogMsg "Turning off VM:'${vmName}'" 
         Start-Sleep -Seconds 5
-    }
-
+	}
+    LogMsg "Enabling  Guest services on VM:'${vmName}'"
     Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
-    Start-VM -Name $vmName -ComputerName $hvServer
+    LogMsg "Starting VM:'${vmName}'"
+	Start-VM -Name $vmName -ComputerName $hvServer
 
-    # Waiting for the VM to run again and respond to SSH - port 22
-    do {
-        sleep 5
-    } until (Test-NetConnection $IPv4 -Port 22 -WarningAction SilentlyContinue | ? { $_.TcpTestSucceeded } )
+	# Waiting for the VM to run again and respond to SSH - port 22
+	do {
+		sleep 5
+	} until (Test-NetConnection $IPv4 -Port 22 -WarningAction SilentlyContinue | ? { $_.TcpTestSucceeded } )
 }
-
 # Get VHD path of tested server; file will be copied there
 $vhd_path = Get-VMHost -ComputerName $hvServer | Select -ExpandProperty VirtualHardDiskPath
 
@@ -322,24 +303,24 @@ $filePath = $vhd_path + $testfile
 $file_path_formatted = $vhd_path_formatted + $testfile
 
 if ($gsi.OperationalStatus -ne "OK") {
-    "Error: The Guest services are not working properly for VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-    $retVal = $False
+   LogErr "Error: The Guest services are not working properly for VM '${vmName}'!" 
+    $retVal = "FAILED"
 }
 else {
     # Create a sample file
     $createfile = fsutil file createnew \\$hvServer\$file_path_formatted $fileSize
 
     if ($createfile -notlike "File *testfile-*.file is created") {
-        "Error: Could not create the sample test file in the working directory!" | Tee-Object -Append -file $summaryLog
-        $retVal = $False
+       LogErr "Error: Could not create the sample test file in the working directory!" 
+        $retVal = "FAILED"
     }
 }
 
 # Verifying if /tmp folder on guest exists; if not, it will be created
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "[ -d /tmp ]"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "[ -d /tmp ]"
 if (-not $?){
-    Write-Output "Folder /tmp not present on guest. It will be created"
-    .\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "mkdir /tmp"
+    LogMsg "Folder /tmp not present on guest. It will be created"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "mkdir /tmp"
 }
 
 #
@@ -347,14 +328,14 @@ if (-not $?){
 #
 $sts = check_fcopy_daemon
 if (-not $sts[-1]) {
-    Write-Output "ERROR: File copy daemon is not running inside the Linux guest VM!" | Tee-Object -Append -file $summaryLog
-    $retVal = $False
+    LogErr "ERROR: File copy daemon is not running inside the Linux guest VM!" 
+    $retVal = "FAILED"
 }
 
 $sts = mount_disk
 if (-not $sts[-1]) {
-    Write-Output "ERROR: Failed to mount the disk in the VM." | Tee-Object -Append -file $summaryLog
-    $retVal = $False
+    LogErr "ERROR: Failed to mount the disk in the VM." 
+    $retVal = "FAILED"
 }
 
 #
@@ -364,27 +345,27 @@ for($i=0; $i -ne 4; $i++){
     if ($retval) {
         $sts = copy_file_vm
         if (-not $sts) {
-            Write-Output "ERROR: File could not be copied!" | Tee-Object -Append -file $summaryLog
-            $retVal = $False
+            LogErr "ERROR: File could not be copied!" 
+            $retVal = "FAILED"
             break
         }
-        Write-Output "Info: File has been successfully copied to guest VM '${vmName}'"
+        LogMsg "Info: File has been successfully copied to guest VM '${vmName}'"
 
         $sts = check_file_vm
         if (-not $sts) {
-            Write-Output "ERROR: File check error on the guest VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-            $retVal = $False
+            LogErr "ERROR: File check error on the guest VM '${vmName}'!" 
+            $retVal = "FAILED"
             break
         }
-        Write-Output "Info: The file copied matches the ${originalFileSize} size."
+        LogMsg "Info: The file copied matches the ${originalFileSize} size."
 
         $sts = remove_file_vm
         if (-not $sts) {
-            Write-Output "ERROR: Failed to remove file from VM $vmName." | Tee-Object -Append -file $summaryLog
-            $retVal = $False
+            LogErr "ERROR: Failed to remove file from VM $vmName." 
+            $retVal = "FAILED"
             break
         }
-        Write-Output "Info: File has been successfully removed from guest VM '${vmName}'"
+        LogMsg "Info: File has been successfully removed from guest VM '${vmName}'"
     }
     else {
         break
@@ -396,7 +377,13 @@ for($i=0; $i -ne 4; $i++){
 #
 Remove-Item -Path \\$hvServer\$file_path_formatted -Force
 if (-not $?) {
-    Write-Output "ERROR: Cannot remove the test file '${testfile}'!" | Tee-Object -Append -file $summaryLog
+    LogErr "ERROR: Cannot remove the test file '${testfile}'!" 
 }
 
 return $retVal
+}
+
+Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `
+         -ipv4 $AllVMData.PublicIP -vmPort $AllVMData.SSHPort `
+         -vmUserName $user -vmPassword $password -rootDir $WorkingDirectory `
+         -testParams $testParams

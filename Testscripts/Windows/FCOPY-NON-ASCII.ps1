@@ -28,29 +28,21 @@
     it will copy the file to the Linux VM. Finally, the script will verify
     both checksums (on host and guest).
 
-    A typical XML definition for this test case would look similar
-    to the following:
-        <test>
-            <testName>FCOPY_non_ascii</testName>
-            <testScript>setupscripts\FCOPY_non_ascii.ps1</testScript>
-			<files>remote-scripts/ica/utils.sh</files>
-            <timeout>900</timeout>
-            <testParams>
-                <param>TC_COVERED=FCopy-05</param>
-            </testParams>
-            <noReboot>True</noReboot>
-        </test>
-.Parameter vmName
-    Name of the VM to test.
-.Parameter hvServer
-    Name of the Hyper-V server hosting the VM.
-.Parameter testParams
-    Test data for this test case.
-.Example
-    setupScripts\FCOPY_non_ascii.ps1 -vmName NameOfVm -hvServer localhost -testParams 'sshKey=path/to/ssh;ipv4=ipaddress;rootDir=path/to/dir'
 #>
 
-param([string] $vmName, [string] $hvServer, [string] $testParams)
+param([String] $TestParams)
+
+function Main {
+    param (
+        $VMName,
+        $HvServer,
+        $Ipv4,
+        $VMPort,
+        $VMUserName,
+        $VMPassword,
+        $RootDir,
+        $TestParams
+    )
 
 $retVal = $false
 
@@ -61,8 +53,8 @@ function RemoveTestFile()
 {
     Remove-Item -Path $pathToFile -Force
     if ($? -ne "True") {
-        Write-Output "Error: cannot remove the test file '${testfile}'!" | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "Error: cannot remove the test file '${testfile}'!" 
+        return "FAILED"
     }
 }
 
@@ -92,7 +84,6 @@ foreach ($p in $params)
     $fields = $p.Split("=")
         switch ($fields[0].Trim())
         {
-        "sshKey" { $sshKey = $fields[1].Trim() }
         "ipv4" { $ipv4 = $fields[1].Trim() }
         "rootdir" { $rootDir = $fields[1].Trim() }
         "TC_COVERED" { $TC_COVERED = $fields[1].Trim() }
@@ -100,100 +91,86 @@ foreach ($p in $params)
         }
 }
 
-if ($null -eq $sshKey)
-{
-    "Error: Test parameter sshKey was not specified"
-    return $False
-}
 
 if ($null -eq $ipv4)
 {
-    "Error: Test parameter ipv4 was not specified"
-    return $False
+  LogErr  "Error: Test parameter ipv4 was not specified"
+    return "FAILED"
 }
 
 if ($null -eq $rootdir)
 {
-    "Error: Test parameter rootdir was not specified"
-    return $False
+  LogErr  "Error: Test parameter rootdir was not specified"
+    return "FAILED"
 }
 
 # Change the working directory to where we need to be
 cd $rootDir
 
-# Source TCUtils.ps1 for test related functions
-if (Test-Path ".\setupscripts\TCUtils.ps1") {
-    . .\setupScripts\TCUtils.ps1
-}
-else {
-    "Error: Could not find setupScripts\TCUtils.ps1"
-    return $false
-}
+
 
 # if host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0)
 {
-    return $false
+    return "FAILED"
 }
 elseif ($BuildNumber -lt 9600)
 {
-    return $Skipped
+    return "Skipped"
 }
 # Delete any previous summary.log file, then create a new one
-$summaryLog = "${vmName}_summary.log"
-del $summaryLog -ErrorAction SilentlyContinue
-Write-Output "This script covers test case: ${TC_COVERED}" | Tee-Object -Append -file $summaryLog
+
+LogMsg "This script covers test case: ${TC_COVERED}" 
 
 #
 # Verify if the Guest services are enabled for this VM
 #
 $gsi = Get-VMIntegrationService -vmName $vmName -ComputerName $hvServer -Name "Guest Service Interface"
 if (-not $gsi) {
-    Write-Output "Error: Unable to retrieve Integration Service status for VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    return $False
+    LogErr "Error: Unable to retrieve Integration Service status from VM '${vmName}'" 
+    return "Aborted"
 }
 
 if (-not $gsi.Enabled) {
-    Write-Output "Warning: The Guest services are not enabled for VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    if ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
-        Stop-VM -ComputerName $hvServer -Name $vmName -Force -Confirm:$false
-    }
+    LogMsg "Warning: The Guest services are not enabled for VM '${vmName}'" 
+	if ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+		Stop-VM -ComputerName $hvServer -Name $vmName -Force -Confirm:$false
+	}
 
-    # Waiting until the VM is off
-    while ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+	# Waiting until the VM is off
+	while ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
+        LogMsg "Turning off VM:'${vmName}'" 
         Start-Sleep -Seconds 5
-    }
-
+	}
+    LogMsg "Enabling  Guest services on VM:'${vmName}'"
     Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
-    Start-VM -Name $vmName -ComputerName $hvServer
+    LogMsg "Starting VM:'${vmName}'"
+	Start-VM -Name $vmName -ComputerName $hvServer
 
-    # Waiting for the VM to run again and respond to SSH - port 22
-    do {
-        sleep 5
-    } until (Test-NetConnection $IPv4 -Port 22 -WarningAction SilentlyContinue | ? { $_.TcpTestSucceeded } )
-}
-else {
-    Write-Output "Info: Guest services are enabled on VM '${vmName}'"
+	# Waiting for the VM to run again and respond to SSH - port 22
+	do {
+		sleep 5
+	} until (Test-NetConnection $IPv4 -Port 22 -WarningAction SilentlyContinue | ? { $_.TcpTestSucceeded } )
 }
 
 # Check to see if the fcopy daemon is running on the VM
 $sts = RunRemoteScript "FCOPY_Check_Daemon.sh"
 if (-not $sts[-1])
 {
-    Write-Output "Error executing FCOPY_Check_Daemon.sh on VM. Exiting test case!" | Tee-Object -Append -file $summaryLog
-    return $False
+   LogErr "Error executing FCOPY_Check_Daemon.sh on VM. Exiting test case!" 
+    return "FAILED"
 }
 
 Remove-Item -Path "FCOPY_Check_Daemon.sh.log" -Force
-Write-Output "Info: fcopy daemon is running on VM '${vmName}'"
+LogMsg "Info: fcopy daemon is running on VM '${vmName}'"
 
 #
 # Creating the test file for sending on VM
 #
 if ($gsi.OperationalStatus -ne "OK") {
-    Write-Output "Error: The Guest services are not working properly for VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-    $retVal = $False
+   LogErr "Error: The Guest services are not working properly for VM '${vmName}'!" 
+    $retVal = "FAILED"
 }
 else {
     # Define the file-name to use with the current time-stamp
@@ -213,11 +190,11 @@ else {
 
     # Checking if sample file was successfully created
     if (-not $?){
-        Write-Output "Error: Unable to create the 2MB sample file" | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "Error: Unable to create the 2MB sample file" 
+        return "FAILED"
     }
     else {
-        Write-Output "Info: initial 2MB sample file $testfile successfully created"
+        LogMsg "Info: initial 2MB sample file $testfile successfully created"
     }
 
     # Multiply the contents of the sample file up to an 100MB auxiliary file
@@ -229,8 +206,8 @@ else {
 
     # Checking if auxiliary file was successfully created
     if (-not $?){
-        Write-Output "Error: Unable to create the extended auxiliary file!" | Tee-Object -Append -file $summaryLog
-        return $False
+        LogErr "Error: Unable to create the extended auxiliary file!" 
+        return "FAILED"
     }
 
     # Move the auxiliary file to testfile
@@ -239,28 +216,28 @@ else {
     # Checking file size. It must be over 85MB
     $testfileSize = (Get-Item $pathToFile).Length
     if ($testfileSize -le 85mb) {
-        Write-Output "Error: File not big enough. File size: $testfileSize MB" | Tee-Object -Append -file $summaryLog
+        LogErr "Error: File not big enough. File size: $testfileSize MB" g
         $testfileSize = $testfileSize / 1MB
         $testfileSize = [math]::round($testfileSize,2)
-        Write-Output "Error: File not big enough (over 85MB)! File size: $testfileSize MB" | Tee-Object -Append -file $summaryLog
+        LogErr "Error: File not big enough (over 85MB)! File size: $testfileSize MB" 
         RemoveTestFile
-        return $False
+        return "FAILED"
     }
     else {
         $testfileSize = $testfileSize / 1MB
         $testfileSize = [math]::round($testfileSize,2)
-		Write-Output "Info: $testfileSize MB auxiliary file successfully created"
+		LogMsg "Info: $testfileSize MB auxiliary file successfully created"
     }
 
     # Getting MD5 checksum of the file
     $local_chksum = Get-FileHash .\$testfile -Algorithm MD5 | Select -ExpandProperty hash
     if (-not $?){
-        Write-Output "Error: Unable to get MD5 checksum!" | Tee-Object -Append -file $summaryLog
+       LogErr "Error: Unable to get MD5 checksum!" 
         RemoveTestFile
-        return $False
+        return "FAILED"
     }
     else {
-        Write-Output "MD5 file checksum on the host-side: $local_chksum" | Tee-Object -Append -file $summaryLog
+        LogMsg "MD5 file checksum on the host-side: $local_chksum"
     }
 
     # Get vhd folder
@@ -281,7 +258,7 @@ else {
 }
 
 # Removing previous test files on the VM
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "rm -f /tmp/testfile-*"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "rm -f /tmp/testfile-*"
 
 #
 # Sending the test file to VM
@@ -289,54 +266,60 @@ else {
 $Error.Clear()
 Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/tmp/" -FileSource host -ErrorAction SilentlyContinue
 if ($Error.Count -eq 0) {
-    Write-Output "File has been successfully copied to guest VM '${vmName}'" | Tee-Object -Append -file $summaryLog
+    LogMsg "File has been successfully copied to guest VM '${vmName}'" 
 }
 elseif (($Error.Count -gt 0) -and ($Error[0].Exception.Message -like "*failed to initiate copying files to the guest: The file exists. (0x80070050)*")) {
-    Write-Output "Test failed! File could not be copied as it already exists on guest VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    return $False
+    LogErr "Test failed! File could not be copied as it already exists on guest VM '${vmName}'" 
+    return "FAILED"
 }
 RemoveTestFile
 
 #
 # Verify if the file is present on the guest VM
 #
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "stat /tmp/testfile-* > /dev/null" 2> $null
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "stat /tmp/testfile-* > /dev/null" 2> $null
 if (-not $?) {
-	Write-Output "Error: Test file is not present on the guest VM!" | Tee-Object -Append -file $summaryLog
-	return $False
+	LogErr "Error: Test file is not present on the guest VM!" 
+	return "FAILED"
 }
 
 #
 # Verify if the file is present on the guest VM
 #
-$remote_chksum=.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "openssl MD5 /tmp/testfile-* | cut -f2 -d' '"
+$remote_chksum=.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "openssl MD5 /tmp/testfile-* | cut -f2 -d' '"
 if (-not $?) {
-	Write-Output "Error: Could not extract the MD5 checksum from the VM!" | Tee-Object -Append -file $summaryLog
-	return $False
+	LogErr "Error: Could not extract the MD5 checksum from the VM!" 
+	return "FAILED"
 }
 
-Write-Output "MD5 file checksum on guest VM: $remote_chksum" | Tee-Object -Append -file $summaryLog
+LogMsg"MD5 file checksum on guest VM: $remote_chksum" 
 
 #
 # Check if checksums are matching
 #
 $MD5IsMatching = @(Compare-Object $local_chksum $remote_chksum -SyncWindow 0).Length -eq 0
 if ( -not $MD5IsMatching) {
-    Write-Output "Error: MD5 checksum missmatch between host and VM test file!" | Tee-Object -Append -file $summaryLog
-    return $False
+    LogErr "Error: MD5 checksum missmatch between host and VM test file!" 
+    return "FAILED"
 }
 
-Write-Output "Info: MD5 checksums are matching between the host-side and guest VM file." | Tee-Object -Append -file $summaryLog
+Write-Output "Info: MD5 checksums are matching between the host-side and guest VM file." 
 
 # Removing the temporary test file
 Remove-Item -Path \\$hvServer\$file_path_formatted -Force
 if ($? -ne "True") {
-    Write-Output "Error: cannot remove the test file '${testfile}'!" | Tee-Object -Append -file $summaryLog
-	return $False
+    LogErr "Error: cannot remove the test file '${testfile}'!" 
+	return "FAILED"
 }
 
 #
 # If we made it here, everything worked
 #
-Write-Output "Test completed successfully"
-return $True
+LogMsg "Test completed successfully"
+return "PASSED"
+}
+
+Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `
+         -ipv4 $AllVMData.PublicIP -vmPort $AllVMData.SSHPort `
+         -vmUserName $user -vmPassword $password -rootDir $WorkingDirectory `
+         -testParams $testParams

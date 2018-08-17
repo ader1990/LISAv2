@@ -28,34 +28,24 @@
 	the Linux VM, when target folder is immutable, 'Guest Service Interface' disabled and
 	hyperverfcopyd is disabled.
 
-    A typical XML definition for this test case would look similar
-    to the following:
-	<test>
-		<testName>FCOPY_negative</testName>
-		<testScript>setupscripts\FCOPY_negative.ps1</testScript>
-		<timeout>900</timeout>
-		<testParams>
-			<param>TC_COVERED=FCopy-08</param>
-		</testParams>
-		<noReboot>False</noReboot>
-	</test>
-
-.Parameter vmName
-    Name of the VM to test.
-
-.Parameter hvServer
-    Name of the Hyper-V server hosting the VM.
-
-.Parameter testParams
-    Test data for this test case.
-
-.Example
-    setupScripts\FCOPY_negative.ps1 -vmName NameOfVm -hvServer localhost -testParams 'sshKey=path/to/ssh;ipv4=ipaddress'
 #>
 
-param([string] $vmName, [string] $hvServer, [string] $testParams)
+param([String] $TestParams)
 
-$retVal = $false
+function Main {
+    param (
+        $VMName,
+        $HvServer,
+        $Ipv4,
+        $VMPort,
+        $VMUserName,
+        $VMPassword,
+        $RootDir,
+        $TestParams
+    )
+
+
+$retVal = "FAILED"
 $testfile = $null
 
 #######################################################################
@@ -97,9 +87,6 @@ foreach ($p in $params) {
 	if ($fields[0].Trim() -eq "ipv4") {
 		$IPv4 = $fields[1].Trim()
     }
-	if ($fields[0].Trim() -eq "sshkey") {
-        $sshkey = $fields[1].Trim()
-    }
 }
 
 #
@@ -113,37 +100,36 @@ if (-not (Test-Path $rootDir)) {
 cd $rootDir
 
 # Source TCUtils.ps1
-if (Test-Path ".\setupScripts\TCUtils.ps1") {
-    . .\setupScripts\TCUtils.ps1
+if (Test-Path ".\testscripts\Windows\TCUtils.ps1") {
+    . .\testscripts\Windows\TCUtils.ps1
 } else {
-    "Error: Could not find setupScripts\TCUtils.ps1"
+   LogErr "Error: Could not find setupScripts\TCUtils.ps1"
 }
 
 # If host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0){
-    return $false
+    return "FAILED"
 }
 elseif ($BuildNumber -lt 9600){
-    Write-Output "Hyper-v host version $BuildNumber does not support fcopy, skipping test." | Tee-Object -Append -file $summaryLog
-    return $Skipped
+    LogMsg "Hyper-v host version $BuildNumber does not support fcopy, skipping test." 
+    return "Skipped"
 }
 
 # If vm does not support systemd, skip test.
 $sts = CheckSystemd
 if ($sts[-1] -eq $false){
-    Write-Output "Distro does not support systemd, skipping test." | Tee-Object -Append -file $summaryLog
-    return $Skipped
+    LogMsg "Distro does not support systemd, skipping test."
+    return "Skipped"
 }
 
 # Delete any previous summary.log file, then create a new one
-$summaryLog = "${vmName}_summary.log"
-del $summaryLog -ErrorAction SilentlyContinue
-Write-Output "This script covers test case: ${TC_COVERED}" | Tee-Object -Append -file $summaryLog
+
+LogMsg "This script covers test case: ${TC_COVERED}" 
 
 # Delete any previous test files
-echo y | bin\plink.exe -i ssh\${sshKey} root@${ipv4} exit
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "rm -rf /tmp/testfile-* 2>/dev/null"
+echo y | \Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 exit
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "rm -rf /tmp/testfile-* 2>/dev/null"
 
 #
 # Setup: Create temporary test file in the host
@@ -168,112 +154,117 @@ $file_path_formatted = $vhd_path_formatted + $testfile
 $createfile = fsutil file createnew \\$hvServer\$file_path_formatted 10485760
 
 if ($createfile -notlike "File *testfile-*.file is created") {
-    "Error: Could not create the sample test file in the working directory!" | Tee-Object -Append -file $summaryLog
-    return $false
+   LogErr "Error: Could not create the sample test file in the working directory!"
+    return "FAILED"
 }
 
 Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
 
 if ( $? -ne $true) {
-    "Error: The Guest services are not working properly for VM!" | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr "Error: The Guest services are not working properly for VM!"
+    return "FAILED"
 }
 
 # The fcopy daemon must be running on the Linux guest VM
 $sts = check_fcopy_daemon
 if (-not $sts[-1]) {
-    Write-Output "ERROR: file copy daemon is not running inside the Linux guest VM!" | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr "ERROR: file copy daemon is not running inside the Linux guest VM!"
+    return "FAILED"
 }
 #
 # Step 1: verify the file cannot copy to vm when target folder is immutable
 #
-Write-Output "Info: Step 1: fcopy file to vm when target folder is immutable"
+LogMsg "Info: Step 1: fcopy file to vm when target folder is immutable"
 
 # Verifying if /tmp folder on guest exists; if not, it will be created
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "[ -d /test ] || mkdir /test ; chattr +i /test"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "[ -d /test ] || mkdir /test ; chattr +i /test"
 
 if (-not $?){
-    Write-Output "Error: Fail to change the permission for /test"
+    LogErr "Error: Fail to change the permission for /test"
 }
 
 $Error.Clear()
 Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/test" -FileSource host -ErrorAction SilentlyContinue
 
 if ( $? -eq $true ) {
-    Write-Output "Error: File has been copied to guest VM even  target folder immutable " | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr  "Error: File has been copied to guest VM even  target folder immutable "
+    return "FAILED"
 }
 elseif (($Error.Count -gt 0) -and ($Error[0].Exception.Message -like "*failed to initiate copying files to the guest*")) {
-    Write-Output $Error[0].Exception.Message
-    Write-Output "Info: File could not be copied to VM as expected since target folder immutable" | Tee-Object -Append -file $summaryLog
+    LogMsg $Error[0].Exception.Message
+    LogMsg  "Info: File could not be copied to VM as expected since target folder immutable"
 }
 
 #
 # Step 2: verify the file cannot copy to vm when "Guest Service Interface" is disabled
 #
-Write-Output "Info: Step 2: fcopy file to vm when 'Guest Service Interface' is disabled"
+LogMsg "Info: Step 2: fcopy file to vm when 'Guest Service Interface' is disabled"
 Disable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
 if ( $? -eq $false) {
-    "Error: Fail to disable 'Guest Service Interface'" | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr "Error: Fail to disable 'Guest Service Interface'" 
+    return "FAILED"
 }
 
 $Error.Clear()
 Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/tmp/" -FileSource host -ErrorAction SilentlyContinue
 
 if ( $? -eq $true ) {
-    Write-Output "Error: File has been copied to guest VM even 'Guest Service Interface' disabled" | Tee-Object -Append -file $summaryLog
-    return $false
+   LogErr "Error: File has been copied to guest VM even 'Guest Service Interface' disabled"
+    return "FAILED"
 }
 elseif (($Error.Count -gt 0) -and ($Error[0].Exception.Message -like "*Failed to initiate copying files to the guest*")) {
-    Write-Output $Error[0].Exception.Message
-    Write-Output "Info: File could not be copied to VM as expected since 'Guest Service Interface' disabled" | Tee-Object -Append -file $summaryLog
-}
+    LogMsg $Error[0].Exception.Message
+    LogMsg "Info: File could not be copied to VM as expected since 'Guest Service Interface' disabled"
 
 #
 # Step 3: verify the file cannot copy to vm when hypervfcopyd is stopped
 #
-Write-Output "Info: Step 3: fcopy file to vm when hypervfcopyd stopped"
+LogMsg "Info: Step 3: fcopy file to vm when hypervfcopyd stopped"
 Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
 if ( $? -ne $true) {
-    "Error: Fail to enable 'Guest Service Interface'"  | Tee-Object -Append -file $summaryLog
-    return $false
+    "Error: Fail to enable 'Guest Service Interface'" 
+    return "FAILED"
 }
 
 # Stop fcopy daemon to do negative test
 $sts = stop_fcopy_daemon
 if (-not $sts[-1]) {
-    Write-Output "ERROR: Failed to stop hypervfcopyd inside the VM!" | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr "ERROR: Failed to stop hypervfcopyd inside the VM!"
+    return "FAILED"
 }
 
 $Error.Clear()
 Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/tmp/" -FileSource host -ErrorAction SilentlyContinue
 
 if ( $? -eq $true ) {
-    Write-Output "Error: file has been copied to guest VM even hypervfcopyd stopped" | Tee-Object -Append -file $summaryLog
-    return $false
+    LogErr "Error: file has been copied to guest VM even hypervfcopyd stopped"
+    return "FAILED"
 }
 elseif (($Error.Count -gt 0) -and ($Error[0].Exception.Message -like "*failed to initiate copying files to the guest*")) {
-    Write-Output $Error[0].Exception.Message
-    Write-Output "Info: File could not be copied to VM as expected since hypervfcopyd stopped " | Tee-Object -Append -file $summaryLog
+    LogMsg $Error[0].Exception.Message
+    LogMsg "Info: File could not be copied to VM as expected since hypervfcopyd stopped "
 }
 
 # Verify the file does not exist after hypervfcopyd start
-$daemonName = .\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "systemctl list-unit-files | grep fcopy"
+$daemonName = .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "systemctl list-unit-files | grep fcopy"
 $daemonName = $daemonName.Split(".")[0]
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "systemctl start $daemonName"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "systemctl start $daemonName"
 start-sleep -s 2
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "ls /tmp/testfile-*"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ls /tmp/testfile-*"
 if ($? -eq $true) {
     Write-Output "Error: File has been copied to guest vm after restart hypervfcopyd"
-    return $false
+    return "FAILED"
 }
 # Removing the temporary test file
 Remove-Item -Path \\$hvServer\$file_path_formatted -Force
 if ($? -ne "True") {
-    Write-Output "ERROR: cannot remove the test file '${testfile}'!" | Tee-Object -Append -file $summaryLog
+   LogErr "ERROR: cannot remove the test file '${testfile}'!" 
 }
 
-return $true
+return "PASSED"
+}
+
+Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `
+         -ipv4 $AllVMData.PublicIP -vmPort $AllVMData.SSHPort `
+         -vmUserName $user -vmPassword $password -rootDir $WorkingDirectory `
+         -testParams $testParams

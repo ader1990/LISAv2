@@ -27,36 +27,26 @@
     The script will copy a random generated 10MB file from a Windows host to
 	the Linux VM, and then checks if the size is matching.
 
-    A typical XML definition for this test case would look similar
-    to the following:
-		<test>
-			<testName>FCOPY_basic</testName>
-			<testScript>setupscripts\FCOPY_basic.ps1</testScript>
-			<timeout>900</timeout>
-			<testParams>
-				<param>TC_COVERED=FCopy-01</param>
-			</testParams>
-			<noReboot>True</noReboot>
-		</test>
 
-.Parameter vmName
-    Name of the VM to test.
-
-.Parameter hvServer
-    Name of the Hyper-V server hosting the VM.
-
-.Parameter testParams
-    Test data for this test case.
-
-.Example
-    setupScripts\FCOPY_basic.ps1 -vmName NameOfVm -hvServer localhost -testParams 'sshKey=path/to/ssh;ipv4=ipaddress'
 #>
+param([String] $TestParams)
 
-param([string] $vmName, [string] $hvServer, [string] $testParams)
+function Main {
+    param (
+        $VMName,
+        $HvServer,
+        $Ipv4,
+        $VMPort,
+        $VMUserName,
+        $VMPassword,
+        $RootDir,
+        $TestParams
+    )
 
-$retVal = $false
+$retVal = "FAILED"
 $testfile = $null
 $gsi = $null
+
 
 #######################################################################
 #
@@ -67,24 +57,22 @@ function check_fcopy_daemon()
 {
 	$filename = ".\fcopy_present"
 
-    .\bin\plink -i ssh\${sshKey} root@${ipv4} "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
     if (-not $?) {
-        Write-Error -Message  "ERROR: Unable to verify if the fcopy daemon is running" -ErrorAction SilentlyContinue
-        Write-Output "ERROR: Unable to verify if the fcopy daemon is running"
-        return $False
+        LogErr  "ERROR: Unable to verify if the fcopy daemon is running" 
+        return "ABORTED"
     }
 
-    .\bin\pscp -i ssh\${sshKey} root@${ipv4}:/tmp/fcopy_present .
+    .\Tools\pscp.exe -C -pw $vmPassword -P $vmPort $vmUserName@${ipv4}:/tmp/fcopy_present .
     if (-not $?) {
-		Write-Error -Message "ERROR: Unable to copy the confirmation file from the VM" -ErrorAction SilentlyContinue
-		Write-Output "ERROR: Unable to copy the confirmation file from the VM"
-		return $False
+		LogErr "ERROR: Unable to copy the confirmation file from the VM"
+		return "ABORTED"
     }
 
     # When using grep on the process in file, it will return 1 line if the daemon is running
     if ((Get-Content $filename  | Measure-Object -Line).Lines -eq  "1" ) {
 		Write-Output "Info: hv_fcopy_daemon process is running."
-		$retValue = $True
+		$retValue = "PASSED"
     }
 
     del $filename
@@ -98,12 +86,12 @@ function check_fcopy_daemon()
 #######################################################################
 function check_file([String] $testfile)
 {
-    .\bin\plink -i ssh\${sshKey} root@${ipv4} "wc -c < /tmp/$testfile"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "wc -c < /tmp/$testfile"
     if (-not $?) {
-        Write-Output "ERROR: Unable to read file" -ErrorAction SilentlyContinue
-        return $False
+        LogErr "ERROR: Unable to read file" 
+        return "FAILED"
     }
-	return $True
+	return "PASSED"
 }
 
 #######################################################################
@@ -111,21 +99,22 @@ function check_file([String] $testfile)
 #	Main body script
 #
 #######################################################################
-
+# Debug - display the test parameters so they are captured in the log file
+LogMsg "TestParams : '${testParams}'"
 # Checking the input arguments
 if (-not $vmName) {
-    "Error: VM name is null!"
+   LogErr "Error: VM name is null!"
     return $retVal
 }
 
 if (-not $hvServer) {
-    "Error: hvServer is null!"
+    LogErr  "Error: hvServer is null!"
     return $retVal
 }
 
 if (-not $testParams) {
-    "Error: No testParams provided!"
-    "This script requires the test case ID and VM details as the test parameters."
+    LogErr "Error: No testParams provided!"
+    LogErr  "This script requires the test case ID and VM details as the test parameters."
     return $retVal
 }
 
@@ -145,9 +134,6 @@ foreach ($p in $params) {
 	if ($fields[0].Trim() -eq "ipv4") {
 		$IPv4 = $fields[1].Trim()
     }
-	if ($fields[0].Trim() -eq "sshkey") {
-        $sshkey = $fields[1].Trim()
-    }
 }
 
 #
@@ -155,57 +141,50 @@ foreach ($p in $params) {
 # Delete any previous summary.log file, then create a new one
 #
 if (-not (Test-Path $rootDir)) {
-    "Error: The directory `"${rootDir}`" does not exist"
+    LogErr "Error: The directory `"${rootDir}`" does not exist"
     return $retVal
 }
 cd $rootDir
 
-# Source TCUtils.ps1
-if (Test-Path ".\setupScripts\TCUtils.ps1") {
-    . .\setupScripts\TCUtils.ps1
-} else {
-    "Error: Could not find setupScripts\TCUtils.ps1"
-}
 
 # if host build number lower than 9600, skip test
 $BuildNumber = GetHostBuildNumber $hvServer
 if ($BuildNumber -eq 0)
 {
-    return $false
+    return "FAILED"
 }
 elseif ($BuildNumber -lt 9600)
 {
-    return $Skipped
+    return "PASSED"
 }
 
-# Delete any previous summary.log file, then create a new one
-$summaryLog = "${vmName}_summary.log"
-del $summaryLog -ErrorAction SilentlyContinue
-Write-Output "This script covers test case: ${TC_COVERED}" | Tee-Object -Append -file $summaryLog
 
-$retVal = $True
+LogMsg "This script covers test case: ${TC_COVERED}" 
+$retVal = "PASSED"
 
 #
 # Verify if the Guest services are enabled for this VM
 #
 $gsi = Get-VMIntegrationService -vmName $vmName -ComputerName $hvServer -Name "Guest Service Interface"
 if (-not $gsi) {
-    "Error: Unable to retrieve Integration Service status from VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-    return $False
+    LogErr "Error: Unable to retrieve Integration Service status from VM '${vmName}'" 
+    return "Aborted"
 }
 
 if (-not $gsi.Enabled) {
-    "Warning: The Guest services are not enabled for VM '${vmName}'" | Tee-Object -Append -file $summaryLog
+    LogMsg "Warning: The Guest services are not enabled for VM '${vmName}'" 
 	if ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
 		Stop-VM -ComputerName $hvServer -Name $vmName -Force -Confirm:$false
 	}
 
 	# Waiting until the VM is off
 	while ((Get-VM -ComputerName $hvServer -Name $vmName).State -ne "Off") {
-		Start-Sleep -Seconds 5
+        LogMsg "Turning off VM:'${vmName}'" 
+        Start-Sleep -Seconds 5
 	}
-
-	Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
+    LogMsg "Enabling  Guest services on VM:'${vmName}'"
+    Enable-VMIntegrationService -Name "Guest Service Interface" -vmName $vmName -ComputerName $hvServer
+    LogMsg "Starting VM:'${vmName}'"
 	Start-VM -Name $vmName -ComputerName $hvServer
 
 	# Waiting for the VM to run again and respond to SSH - port 22
@@ -232,65 +211,72 @@ $file_path_formatted = $vhd_path_formatted + $testfile
 
 
 if ($gsi.OperationalStatus -ne "OK") {
-    "Error: The Guest services are not working properly for VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-	$retVal = $False
+   LogErr "Error: The Guest services are not working properly for VM '${vmName}'!" 
+	$retVal = "FAILED"
 }
 else {
 	# Create a 10MB sample file
 	$createfile = fsutil file createnew \\$hvServer\$file_path_formatted 10485760
 
 	if ($createfile -notlike "File *testfile-*.file is created") {
-		"Error: Could not create the sample test file in the working directory!" | Tee-Object -Append -file $summaryLog
-		$retVal = $False
+	LogErr	"Error: Could not create the sample test file in the working directory!" 
+		$retVal = "FAILED"
 	}
 }
 
 # Verifying if /tmp folder on guest exists; if not, it will be created
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "[ -d /tmp ]"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "[ -d /tmp ]"
 if (-not $?){
-    Write-Output "Folder /tmp not present on guest. It will be created"
-    .\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "mkdir /tmp"
+    LogMsg "Folder /tmp not present on guest. It will be created"
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "mkdir /tmp"
 }
 
 # The fcopy daemon must be running on the Linux guest VM
 $sts = check_fcopy_daemon
 if (-not $sts[-1]) {
-    Write-Output "ERROR: file copy daemon is not running inside the Linux guest VM!" | Tee-Object -Append -file $summaryLog
-    $retVal = $False
+    LogErr "ERROR: file copy daemon is not running inside the Linux guest VM!" 
+    $retVal = "FAILED"
 }
 
 # Removing previous test files on the VM
-.\bin\plink.exe -i ssh\${sshKey} root@${ipv4} "rm -f /tmp/testfile-*"
+.\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "rm -f /tmp/testfile-*"
 
 # If we got here then all checks have passed and we can copy the file to the Linux guest VM
 $Error.Clear()
 Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/tmp/" -FileSource host -ErrorAction SilentlyContinue
 if ($Error.Count -eq 0) {
-	Write-Output "File has been successfully copied to guest VM '${vmName}'" | Tee-Object -Append -file $summaryLog
+	LogMsg "File has been successfully copied to guest VM '${vmName}'" 
 }
 elseif (($Error.Count -gt 0) -and ($Error[0].Exception.Message -like "*failed to initiate copying files to the guest: The file exists. (0x80070050)*")) {
-	Write-Output "Test failed! File could not be copied as it already exists on guest VM '${vmName}'" | Tee-Object -Append -file $summaryLog
-	$retVal = $False
+	LogErr "Test failed! File could not be copied as it already exists on guest VM '${vmName}'"
+	$retVal = "FAILED"
 }
 
 # Checking if the file size is matching
 $sts = check_file $testfile
 if (-not $sts[-1]) {
-	Write-Output "ERROR: File is not present on the guest VM '${vmName}'!" | Tee-Object -Append -file $summaryLog
-	$retVal = $False
+	LogErr "ERROR: File is not present on the guest VM '${vmName}'!" 
+	$retVal = "FAILED"
 }
 elseif ($sts[0] -eq 10485760) {
-	Write-Output "Info: The file copied matches the 10MB size." | Tee-Object -Append -file $summaryLog
+	LogMsg "Info: The file copied matches the 10MB size." 
 }
 else {
-	Write-Output "ERROR: The file copied doesn't match the 10MB size!" | Tee-Object -Append -file $summaryLog
-	$retVal = $False
+	LogErr "ERROR: The file copied doesn't match the 10MB size!" 
+	$retVal = "FAILED"
 }
 
 # Removing the temporary test file
 Remove-Item -Path \\$hvServer\$file_path_formatted -Force
 if ($? -ne "True") {
-    Write-Output "ERROR: cannot remove the test file '${testfile}'!" | Tee-Object -Append -file $summaryLog
+    LogErr "ERROR: cannot remove the test file '${testfile}'!" 
 }
 
 return $retVal
+
+}
+
+Main -vmName $AllVMData.RoleName -hvServer $xmlConfig.config.Hyperv.Host.ServerName `
+         -ipv4 $AllVMData.PublicIP -vmPort $AllVMData.SSHPort `
+         -vmUserName $user -vmPassword $password -rootDir $WorkingDirectory `
+         -testParams $testParams

@@ -2566,7 +2566,293 @@ Function GetStorageAccountFromRegion($Region,$StorageAccount)
 	LogMsg "Selected : $StorageAccountName"
 	return $StorageAccountName
 }
+function GetHostBuildNumber($hvServer)
+{
+    <#
+    .Synopsis
+        Get host BuildNumber.
+    .Description
+        Get host BuildNumber.
+        14393: 2016 host
+        9600: 2012R2 host
+        9200: 2012 host
+        0: error
 
+    #>
+
+    [System.Int32]$buildNR = (Get-WmiObject -class Win32_OperatingSystem -ComputerName $hvServer).BuildNumber
+
+    if ( $buildNR -gt 0 )
+    {
+        return $buildNR
+    }
+    else
+    {
+        LogErr "Get host build number failed" 
+        return 0
+    }
+}
+function CheckFile($vmPassword,$vmPort,$vmUserName,$ipv4,[string] $fileName, [boolean] $checkSize = $False , [boolean] $checkContent = $False )
+{    <#
+    .Synopsis
+        Get host BuildNumber.
+	.Description
+	    Checks if test file is present or not, if set $checkSize as $True, return file size,
+        if set checkContent as $True, will return file content.
+   #>
+    if ($checkSize) {
+        .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "wc -c < $fileName"
+    }
+    else {
+        .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "stat ${fileName} >/dev/null" 
+    }
+
+    if (-not $?) {
+        return $False
+    }
+    if ($checkContent) {
+        .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "dos2unix ${fileName} >/dev/null 2>&1"
+        .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "cat ${fileName}"
+        if (-not $?) {
+            return $False
+        }
+    }
+    return  $True
+}
+function SendCommandToVM($vmPassword,$vmPort,$ipv4, [string] $command)
+{
+    <#
+    .Synopsis
+        Send a command to a Linux VM using SSH.
+    .Description
+        Send a command to a Linux VM using SSH.
+    
+    #>
+
+    $retVal = $False
+
+    if (-not $ipv4)
+    {
+		LogErr "ipv4 is null" 
+        return $False
+    }
+
+    if (-not $vmPassword)
+    {
+        LogErr "vmPassword is null"
+        return $False
+	}
+
+    if (-not $command)
+    {
+		LogErr "command is null"
+        return $False
+    }
+
+    # get around plink questions
+	echo y | .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} root@$ipv4 'exit 0'
+    $process = Start-Process .\Tools\plink.exe -ArgumentList "-C -pw ${vmPassword} -P ${vmPort} root@$ipv4 ${command}" -PassThru -NoNewWindow -Wait -redirectStandardOutput lisaOut_${ipv4}.tmp -redirectStandardError lisaErr_${ipv4}.tmp
+    if ($process.ExitCode -eq 0)
+    {
+		del lisaOut_${ipv4}.tmp -ErrorAction "SilentlyContinue"
+		del lisaErr_${ipv4}.tmp -ErrorAction "SilentlyContinue"
+		
+		$retVal = $True
+    }
+    else
+    {
+        LogErr "Unable to send command to ${ipv4}. Command = '${command}'"
+    }
+
+
+    return $retVal
+}
+function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
+{
+    $retValue = $False
+    $stateFile     = "state.txt"
+    $TestCompleted = "TestCompleted"
+    $TestAborted   = "TestAborted"
+    $TestFailed   = "TestFailed"
+    $TestRunning   = "TestRunning"
+    $TestSkipped   = "TestSkipped"
+    $timeout       = 6000
+    $params        = $scriptParam
+
+	"./${remoteScript} ${params} > ${remoteScript}.log" | out-file -encoding ASCII -filepath runtest_${ipv4}.sh
+	
+    .\Tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} .\runtest_${ipv4}.sh $vmUserName@${ipv4}:/$vmUserName/runtest.sh
+    if (-not $?)
+    {
+       LogErr "ERROR: Unable to copy runtest.sh to the VM"
+       return $False
+    }
+
+    .\Tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} .\Testscripts\Linux\${remoteScript} $vmUserName@${ipv4}:
+    if (-not $?)
+    {
+		LogErr "ERROR: Unable to copy ${remoteScript} to the VM"
+       return $False
+    }
+
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@${ipv4} "dos2unix ${remoteScript} 2> /dev/null"
+    if (-not $?)
+    {
+        LogErr "ERROR: Unable to run dos2unix on ${remoteScript}"
+        return $False
+    }
+
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@${ipv4} "dos2unix runtest.sh  2> /dev/null"
+    if (-not $?)
+    {
+        LogErr "ERROR: Unable to run dos2unix on runtest.sh"
+        return $False
+    }
+
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@${ipv4} "chmod +x ${remoteScript}   2> /dev/null"
+    if (-not $?)
+    {
+        LogErr "ERROR: Unable to chmod +x ${remoteScript}"
+        return $False
+    }
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@${ipv4} "chmod +x runtest.sh  2> /dev/null"
+    if (-not $?)
+    {
+        LogErr "ERROR: Unable to chmod +x runtest.sh " -
+        return $False
+    }
+
+    # Run the script on the vm
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@${ipv4} "./runtest.sh"
+
+    # Return the state file
+    while ($timeout -ne 0 )
+    {
+		.\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} $vmUserName@${ipv4}:${stateFile} ./state_${ipv4}.txt #| out-null
+    $sts = $?
+    if ($sts)
+    {
+        if (test-path ./state_${ipv4}.txt)
+        {
+            $contents = Get-Content -Path ./state_${ipv4}.txt
+            if ($null -ne $contents)
+            {
+                    if ($contents -eq $TestCompleted)
+                    {
+                        LogMsg "Info : state file contains Testcompleted."
+                        $retValue = $True
+                        break
+                    }
+
+                    if ($contents -eq $TestAborted)
+                    {
+						LogMsg "Info : State file contains TestAborted message."
+                         $retValue = $Aborted
+                         break
+                    }
+                    if ($contents -eq $TestFailed)
+                    {
+                        LogMsg "Info : State file contains TestFailed message."
+                        break
+                    }
+                    if ($contents -eq $TestSkipped)
+                    {
+                        $retValue = $Skipped
+                        LogMsg "Info : State file contains TestSkipped message."
+                        break
+                    }
+                    $timeout--
+
+                    if ($timeout -eq 0)
+                    {
+                        LogErr "Error : Timed out on Test Running , Exiting test execution."
+                        break
+                    }
+
+            }
+            else
+            {
+                LogMsg "Warn : state file is empty"
+                break
+            }
+
+        }
+        else
+        {
+			LogMsg "Warn : ssh reported success, but state file was not copied"
+             break
+        }
+    }
+    else
+    {
+		LogErr "Error : pscp exit status = $sts"
+        LogErr "Error : unable to pull state.txt from VM."
+         break
+    }
+    }
+
+    # Get the logs
+    $remoteScriptLog = $remoteScript+".log"
+   .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} $vmUserName@${ipv4}:${remoteScriptLog} .
+    $sts = $?
+    if ($sts)
+    {
+        if (test-path $remoteScriptLog)
+        {
+            $contents = Get-Content -Path $remoteScriptLog
+            if ($null -ne $contents)
+            {
+                if ($null -ne ${TestLogDir})
+                {
+                    move "${remoteScriptLog}" "${TestLogDir}\${remoteScriptLog}"
+                }
+                else
+                {
+					LogMsg "INFO: $remoteScriptLog is copied in ${rootDir}"
+                }
+            }
+            else
+            {
+				LogMsg "Warn: $remoteScriptLog is empty"
+            }
+        }
+        else
+        {
+            LogMsg "Warn: ssh reported success, but $remoteScriptLog file was not copied"
+        }
+    }
+
+    # Cleanup
+    del state_${ipv4}.txt -ErrorAction "SilentlyContinue"
+    del runtest_${ipv4}.sh -ErrorAction "SilentlyContinue"
+    return $retValue
+}
+
+function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
+{
+    $filename = ".\fcopy_present"
+
+    .\Tools\plink.exe -C -pw ${vmPassword} -P ${vmPort} ${vmUserName}@$ipv4 "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
+    if (-not $?) {
+       LogErr  "ERROR: Unable to verify if the fcopy daemon is running"
+        return $False
+    }
+
+    .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} $vmUserName@$ipv4:/tmp/fcopy_present .
+    if (-not $?) {
+		LogErr  "ERROR: Unable to copy the confirmation file from the VM"
+        return $False
+    }
+
+    # When using grep on the process in file, it will return 1 line if the daemon is running
+    if ((Get-Content $filename  | Measure-Object -Line).Lines -eq  "1" ) {
+        LogMsg "Info: hv_fcopy_daemon process is running."
+        $retValue = $True
+    }
+
+    del $filename
+    return $retValue
+}
 function CreateTestResultObject()
 {
 	$objNode = New-Object -TypeName PSObject
