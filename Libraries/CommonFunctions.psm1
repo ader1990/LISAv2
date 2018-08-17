@@ -2595,7 +2595,7 @@ function GetHostBuildNumber($hvServer)
 function CheckFile($vmPassword,$vmPort,$vmUserName,$ipv4,[string] $fileName, [boolean] $checkSize = $False , [boolean] $checkContent = $False )
 {    <#
     .Synopsis
-        Get host BuildNumber.
+         Checks if test file is present or not
 	.Description
 	    Checks if test file is present or not, if set $checkSize as $True, return file size,
         if set checkContent as $True, will return file content.
@@ -2668,6 +2668,13 @@ function SendCommandToVM($vmPassword,$vmPort,$ipv4, [string] $command)
     return $retVal
 }
 function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
+   <#
+    .Synopsis
+        Run script file  on  Linux VM using SSH.
+    .Description
+       Run script file   on  Linux VM using SSH.
+    
+    #>
 {
     $retValue = $False
     $stateFile     = "state.txt"
@@ -2827,7 +2834,198 @@ function RunRemoteScript($remoteScript,$vmPassword,$vmPort,$vmUserName,$ipv4)
     del runtest_${ipv4}.sh -ErrorAction "SilentlyContinue"
     return $retValue
 }
+function check_fcopy_daemon($vmPassword,$vmPort,$vmUserName,$ipv4)
+  <#
+    .Synopsis
+     Verifies that the fcopy_daemon 
+    .Description
+     Verifies that the fcopy_daemon on VM and attempts to copy a file 
+    
+    #>
+{
+	$filename = ".\fcopy_present"
 
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ps -ef | grep '[h]v_fcopy_daemon\|[h]ypervfcopyd' > /tmp/fcopy_present"
+    if (-not $?) {
+        LogErr  "ERROR: Unable to verify if the fcopy daemon is running" 
+        return $False
+    }
+
+    .\Tools\pscp.exe -C -pw $vmPassword -P $vmPort $vmUserName@${ipv4}:/tmp/fcopy_present .
+    if (-not $?) {
+		LogErr "ERROR: Unable to copy the confirmation file from the VM"
+		return $False
+    }
+
+    # When using grep on the process in file, it will return 1 line if the daemon is running
+    if ((Get-Content $filename  | Measure-Object -Line).Lines -eq  "1" ) {
+		LogMsg "Info: hv_fcopy_daemon process is running."
+		$retValue = $True
+    }
+
+    del $filename
+    return $retValue
+}
+function check_file($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile)
+ <#
+    .Synopsis
+    Checks files on VM 
+    .Description
+     Checks files on VM 
+    
+    #>
+{
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "wc -c < /tmp/$testfile"
+    if (-not $?) {
+        LogErr "ERROR: Unable to read file" 
+        return $False
+    }
+	return $True
+}
+function mount_disk($vmPassword,$vmPort,$vmUserName,$ipv4)
+ <#
+    .Synopsis
+     Mounts  and formates to ext3 a disk on vm  
+    .Description
+     Mounts  and formates to ext3 a disk on vm  
+    
+    #>
+{
+    
+
+    $driveName = "/dev/sdb"
+
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo d;echo;echo w)|fdisk ${driveName}"
+    if (-not $sts) {
+        LogErr "ERROR: Failed to format the disk in the VM $vmName." 
+        return $False
+    }
+
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "(echo n;echo p;echo 1;echo;echo;echo w)|fdisk ${driveName}" 
+    if (-not $sts) {
+        LogErr "ERROR: Failed to format the disk in the VM $vmName."
+        return $False
+    }
+
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mkfs.ext3 ${driveName}1"
+    if (-not $sts) {
+        LogErr "ERROR: Failed to make file system in the VM $vmName." 
+        return $False
+    }
+
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "mount ${driveName}1 /mnt"
+    if (-not $sts) {
+        LogErr "ERROR: Failed to mount the disk in the VM $vmName." 
+        return $False
+    }
+
+    LogMsg "Info: $driveName has been mounted to /mnt in the VM $vmName."
+    return $True
+}
+function remove_file_vm($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $testfile)
+ <#
+    .Synopsis
+     Removes testfile from VM   using SendCommandToVM function
+    .Description
+     Removes testfile from VM  using SendCommandToVM function
+    
+    #>
+{
+    
+    $sts = SendCommandToVM $vmPassword  $vmPort $vmUserName $ipv4 "rm -f /mnt/$testfile"
+    if (-not $sts) {
+        return $False
+    }
+    return $True
+}
+function copy_file_vm($vmName,$hvServer,[String] $filePath)
+ <#
+    .Synopsis
+     Copy the file to the Linux guest VM
+    .Description
+    Copy the file to the Linux guest VM
+    
+    #>
+{
+    $Error.Clear()
+    Copy-VMFile -vmName $vmName -ComputerName $hvServer -SourcePath $filePath -DestinationPath "/mnt/" -FileSource host -ErrorAction SilentlyContinue
+    if ($Error.Count -ne 0) {
+        return $false
+    }
+    return $true
+}
+function check_file_vm($vmName,[String] $testfile,[String] $originalFileSize , [String]$fileSize)
+ <#
+    .Synopsis
+     Checking if the file is present on the guest and file size is matching
+    .Description
+    Checking if the file is present on the guest and file size is matching
+    
+    #>
+{
+    $sts = check_file $testfile
+    if (-not $sts[-1]) {
+        LogErr "ERROR: File is not present on the guest VM '${vmName}'!" 
+        return $False
+    }
+    elseif ($sts[0] -ne $fileSize) {
+        LogErr "ERROR: The file copied doesn't match the ${originalFileSize} size!" 
+        return $False
+    }
+    return $True
+}
+function RemoveTestFile($vmPassword,$vmPort,$vmUserName,$ipv4,[String] $pathToFile,[String] $testfile)
+<#
+    .Synopsis
+     Delete temporary test file
+    .Description
+    Delete temporary test file
+    
+    #>
+{
+    Remove-Item -Path $pathToFile -Force
+    if ($? -ne "True") {
+        Write-Output "Error: cannot remove the test file '${testfile}'!" 
+        return $False
+    }
+}
+function check_file_vm($vmName,[String] $testfile,[String] $originalFileSize , [String]$fileSize)
+ <#
+    .Synopsis
+     Checking if the file is present on the guest and file size is matching
+    .Description
+    Checking if the file is present on the guest and file size is matching
+    
+    #>
+{
+    Remove-Item -Path $pathToFile -Force
+    if ($? -ne "True") {
+        LogErr "Error: cannot remove the test file '${testfile}'!" 
+        return "FAILED"
+    }
+}
+function Check-Systemd($vmPassword,$vmPort,$vmUserName,$ipv4)
+{
+    $check1 = $true
+    $check2 = $true
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "ls -l /sbin/init | grep systemd"
+    if ($? -ne "True"){
+       LogMsg "Systemd not found on VM"
+        $check1 = $false
+    }
+
+    .\Tools\plink.exe -C -pw $vmPassword -P $vmPort $vmUserName@$ipv4 "systemd-analyze --help"
+    if ($? -ne "True"){
+        LogMsg "Systemd-analyze not present on VM."
+        $check2 = $false
+    }
+
+    if (($check1 -and $check2) -eq $true) {
+        return "PASSED"
+    } else {
+        return $false
+    }
+}
 function CreateTestResultObject()
 {
 	$objNode = New-Object -TypeName PSObject
