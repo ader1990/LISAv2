@@ -43,4 +43,55 @@
         <Area>Stress</Area>
         <Tags>stress</Tags>
     </test>
+    <test>
+        <testName>MULTIPLE-REBOOT</testName>
+        <testScript>Multiple-Reboot.ps1</testScript>
+        <setupType>SingleVM</setupType>
+        <TestParameters>
+            <param>count=50</param>
+        </TestParameters>
+        <Platform>HyperV</Platform>
+        <Category>Stress</Category>
+        <Area>stress</Area>
+        <Tags>stress,boot</Tags>
+    </test>
+    <test>
+        <testName>SYSBENCH</testName>
+        <testScript>Sysbench.sh</testScript>
+        <files>.\TestScripts\Linux\Sysbench.sh,.\TestScripts\Linux\utils.sh</files>
+        <setupType>SingleVM</setupType>
+        <TestParameters>
+            <param>TEST_FILE=(seqwr seqrewr seqrd rndrd rndwr rndrw)</param>
+        </TestParameters>
+        <Platform>HyperV</Platform>
+        <Category>Stress</Category>
+        <Area>stress</Area>
+        <Tags>stress</Tags>
+    </test>
+    <test>
+        <testName>CHANGE-MTU-RELOAD-NETVSC</testName>
+        <testScript>STRESS-MTU-Netvsc-Reload.ps1</testScript>
+        <setupType>SingleVM</setupType>
+        <Platform>HyperV</Platform>
+        <Category>Stress</Category>
+        <Area>stress</Area>
+        <Tags>stress</Tags>
+    </test>
+    <test>
+        <testName>BOOT-VM-LARGE-MEMORY</testName>
+        <setupScript>.\TestScripts\Windows\SETUP-DM-CONFIGURE-MEMORY.ps1</setupScript>
+        <testScript>STRESS-BootLargeMemory.ps1</testScript>
+        <setupType>SingleVM</setupType>
+        <TestParameters>
+                <param>bootLargeMem=yes</param>
+                <param>enableDM=no</param>
+                <param>startupMem=69632MB</param>
+                <param>staticMem=69632MB</param>
+                <param>memWeight=100</param>
+        </TestParameters>
+        <Platform>HyperV</Platform>
+        <Category>Stress</Category>
+        <Area>stress</Area>
+        <Tags>stress</Tags>
+    </test>
 </TestCases>
