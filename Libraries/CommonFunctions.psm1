@@ -4040,6 +4040,36 @@ Function Set-SRIOVInVMs {
     }
     return $retValue
 }
+function Get-VMEvent {
+    param(
+        $VMName,
+        $StartTime,
+        $EventCode,
+        $HvServer,
+        $RetryCount=30,
+        $RetryInterval=5
+    )
+     $currentRetryCount = 0
+    $testPassed = $false
+    while ($currentRetryCount -lt $RetryCount -and !$testPassed) {
+        LogMsg "Checking eventlog for event code $EventCode triggered by VM ${VMName}"
+        $currentRetryCount++
+        $events = @(Get-WinEvent -FilterHashTable `
+            @{LogName = "Microsoft-Windows-Hyper-V-Worker-Admin";
+              StartTime = $StartTime; ID = $EventCode} `
+            -ComputerName $hvServer -ErrorAction SilentlyContinue)
+        foreach ($evt in $events) {
+            if ($evt.message.Contains($vmName)) {
+                LogErr "Event code $EventCode triggered by VM ${VMName}"
+                LogErr $evt.message
+                $testPassed = $true
+                break
+            }
+        }
+        Start-Sleep $RetryInterval
+    }
+    return $testPassed
+}
 
 # Checks if MAC is valid. Delimiter can be : - or nothing
 function Is-ValidMAC {

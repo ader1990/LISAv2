@@ -59,63 +59,26 @@ function Main {
         LogErr "VM did not receive the ctrl-alt-del signal successfully."
         return "FAIL"
     }
-    $testCaseTimeout = 120
-    while ($testCaseTimeout -gt 0) {
-        if ( (Check-VMState -VMName $VMName -HvServer $HvServer ( "Running" ))) {
-            break
-        }
-        Start-Sleep -seconds 10
-        $testCaseTimeout -= 10
-    }
-    while ($testCaseTimeout -gt 0) {
-        if ( (Test-Port -Ipv4addr $Ipv4) ) {
-            break
-        }
-        Start-Sleep -seconds 10
-        $testCaseTimeout -= 10
-    }
-    if ($testCaseTimeout -eq 0) {
-        LogErr "Test case timed out waiting for the VM to reach Running state after rebooting with ctrl-alt-del."
-        return "FAIL"
+    Wait-VMHeartbeatOK -VMName $VMName -HvServer $HvServer
     }
     #
     # Set the $bootcount variable and reboot the machine $count times.
     #
     LogMsg "Setting the boot count to 0 for rebooting the VM"
     $bootcount = 0
+    $testStartTime = [DateTime]::Now
     while ($count -gt 0) {
         While ( -not (Test-Port -Ipv4addr $Ipv4) ) {
             Start-Sleep 5
         }
         Restart-VM -VMName $VMName -ComputerName $HvServer -Force
         Start-Sleep 5
-        # Set the test case time out.
-        $testCaseTimeout = 120
-        while ($testCaseTimeout -gt 0) {
-            if ( (Check-VMState -VMName $VMName -HvServer $HvServer ( "Running" ))) {
-                break
-            }
-            Start-Sleep -seconds 2
-            $testCaseTimeout -= 2
-        }
-        if ($testCaseTimeout -eq 0) {
-            LogErr "Test case timed out waiting for VM to reboot"
-            return "FAIL"
-        }
+        Wait-VMHeartbeatOK -VMName $VMName -HvServer $HvServer
+
         #
         # During reboot wait till the TCP port 22 to be available on the VM
         #
-        while ($testCaseTimeout -gt 0) {
-            if ( (Test-Port -Ipv4addr $Ipv4) ) {
-                break
-            }
-            Start-Sleep -seconds 2
-            $testCaseTimeout -= 2
-        }
-        if ($testCaseTimeout -eq 0) {
-            LogErr "Test case timed out for VM to go to Running"
-            return "FAIL"
-        }
+        Wait-VMHeartbeatOK -VMName $VMName -HvServer $HvServer
         Start-Sleep -seconds 10
         $count -= 1
         $bootcount += 1
@@ -126,6 +89,16 @@ function Main {
     #
     while ( -not (Test-Port -Ipv4addr $Ipv4) ) {
         Start-Sleep 5
+        #
+        #Check for Event Code 18602
+        #
+        if ((Get-VMEvent -VMName $vmName -HvServer $hvServer -StartTime $testStartTime `
+        -EventCode 18602 -RetryCount 2 -RetryInterval 1)) {
+        LogErr " VM $vmName triggered a critical event 18602 on the host" | `
+        Out-File -Append $summaryLog
+    return "FAIL "
+}
+
     }
     LogMsg  "VM rebooted $bootcount times successfully"
 }

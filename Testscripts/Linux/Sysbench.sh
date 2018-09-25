@@ -16,13 +16,15 @@
 #
 ########################################################################
 ROOT_DIR=$(pwd)
-# For changing Sysbench version only the following parameter has to be changed
-Sysbench_Version=1.0.9
-
+# For changing Sysbench and autoconf version only the following parameter has to be changed
+SYSBENCH_VERSION=1.0.9
+SYSBENCH_URL=https://github.com/akopytov/sysbench/archive/
+AUTOCONF_VERSION=2.69
+AUTOCONF_URL= http://ftp.gnu.org/gnu/autoconf/
 #######################################################################
 # Keeps track of the state of the test
 #######################################################################
-function Cpu-Test() {
+function Cpu_Test() {
     LogMsg "Creating cpu.log and starting test."
     sysbench cpu --num-threads=1 run >${ROOT_DIR}/cpu.log
     if [ $? -ne 0 ]; then
@@ -45,7 +47,7 @@ function Cpu-Test() {
     return "$CPU_PASS"
 }
 # Run Fileio test
-function File-IO() {
+function File_IO() {
     sysbench fileio --num-threads=1 --file-test-mode=$1 prepare >/dev/null 2>&1
     LogMsg "Preparing files to test $1..."
     sysbench fileio --num-threads=1 --file-test-mode=$1 run >${ROOT_DIR}/$1.log
@@ -78,10 +80,10 @@ function File-IO() {
     return "$FILEIO_PASS"
 }
 # Install Sysbench
-function Install-Sysbench() {
+function Install_Sysbench() {
     pushd $ROOT_DIR
     LogMsg "Cloning sysbench"
-    wget https://github.com/akopytov/sysbench/archive/$Sysbench_Version.zip
+    wget ${SYSBENCH_URL}/${Sysbench_Version}.zip
     if [ $? -gt 0 ]; then
         LogErr "Failed to download sysbench."
         SetTestStateFailed
@@ -98,12 +100,12 @@ function Install-Sysbench() {
     case $DISTRO in
     fedora*)
         pushd $ROOT_DIR
-        wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
-        tar xvfvz autoconf-2.69.tar.gz
-        cd autoconf-2.69
+        wget ${AUTOCONF_URL}/autoconf-${AUTOCONF_VERSION}.tar.gz
+        tar xvfvz autoconf-${AUTOCONF_VERSION}.tar.gz
+        cd autoconf-${AUTOCONF_VERSION}
         ./configure
         make && make install
-        yum install devtoolset-2-binutils automake libtool vim -y
+        yum install devtoolset-2-binutils automake libtool  -y
         ;;
 
     ubuntu* | debian*)
@@ -141,15 +143,19 @@ function Install-Sysbench() {
 #
 UtilsInit
 #Install Sysbench
-Install-Sysbench
+Install_Sysbench
 #Run File IO testing
 FILEIO_PASS=-1
 CPU_PASS=-1
-
-Cpu-Test
+LogMsg "Testing CPU"
+Cpu_Test
+if [ $CPU_PASS -eq -1 ]; then
+        LogMsg "ERROR: CPU Test failed "
+        SetTestStateFailed
+    fi
 LogMsg "Testing fileio. Writing to fileio.log."
 for test_item in ${TEST_FILE[*]}; do
-    File-IO $test_item
+    File_IO $test_item
     if [ $FILEIO_PASS -eq -1 ]; then
         LogMsg "ERROR: Test mode $test_item failed "
         SetTestStateFailed
