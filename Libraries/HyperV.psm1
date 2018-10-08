@@ -337,9 +337,35 @@ Function CreateHyperVGroupDeployment([string]$HyperVGroup, $HyperVGroupNameXML, 
                 $CurrentVMOsVHDPath = "$DestinationOsVHDPath\$HyperVGroupName-role-$i-diff-OSDisk${vhdSuffix}"
                 $i += 1
             }
-            $Out = New-VHD -ParentPath "$SourceOsVHDPath\$OsVHD" -Path $CurrentVMOsVHDPath -ComputerName $HyperVHost
-            if ($?)
-            {
+
+            $parentOsVHDPath = $OsVHD
+            if ($SourceOsVHDPath) {
+                $parentOsVHDPath = Join-Path $SourceOsVHDPath $OsVHD
+            }
+            $infoParentOsVHD = Get-VHD $parentOsVHDPath
+            $uriParentOsVHDPath = [System.Uri]$parentOsVHDPath
+            if ($uriParentOsVHDPath -and $uriParentOsVHDPath.isUnc) {
+                LogMsg "Parent VHD path ${parentOsVHDPath} is on an SMB share."
+                if ($infoParentOsVHD.VhdType -eq "Differencing") {
+                    LogErr "Unsupported differencing disk on the share."
+                    $ErrorCount += 1
+                    return $false
+                }
+                LogMsg "Checking if we have a local VHD with the same disk guid on the host"
+                $hypervVHDLocalPath = (Get-VMHost -ComputerName $HyperVHost).VirtualHardDiskPath
+                $vhdName = [System.IO.Path]::GetFileNameWithoutExtension($(Split-Path -Leaf $parentOsVHDPath))
+                $localPathVHD = Join-Path $hypervVHDLocalPath ($vhdName + $infoParentOsVHD.DiskIdentifier + $vhdSuffix)
+                if ((Test-Path $localPathVHD)) {
+                    LogMsg "$vhdName is already found at path ${localPathVHD}"
+                } else {
+                    LogMsg "$vhdName will be copied at path ${localPathVHD}"
+                    Copy-Item -Force $parentOsVHDPath $localPathVHD
+                }
+                $parentOsVHDPath = $localPathVHD
+            }
+
+            $Out = New-VHD -ParentPath $parentOsVHDPath -Path $CurrentVMOsVHDPath -ComputerName $HyperVHost
+            if ($?) {
                 LogMsg "Prerequiste: Prepare OS Disk $CurrentVMOsVHDPath - Succeeded."
                 if ($OverrideVMSize)
                 {
@@ -411,18 +437,16 @@ Function CreateHyperVGroupDeployment([string]$HyperVGroup, $HyperVGroupNameXML, 
                     $Out = Remove-Item -Path $CurrentVMOsVHDPath -Force 
                     $ErrorCount += 1
                 }
-            }
-            else 
-            {
+            } else {
                 LogMsg "Prerequiste: Prepare OS Disk $CurrentVMOsVHDPath - Failed." 
-                $ErrorCount += 1   
+                $ErrorCount += 1
             }
         }
     }
     else 
     {
         LogErr "There are $($CurrentHyperVGroup.Count) HyperV groups. We need 1 HyperV group."
-        $ErrorCount += 1    
+        $ErrorCount += 1
     }
     if ( $ErrorCount -eq 0 )
     {
@@ -430,7 +454,7 @@ Function CreateHyperVGroupDeployment([string]$HyperVGroup, $HyperVGroupNameXML, 
     }
     else 
     {
-        $ReturnValue = $false    
+        $ReturnValue = $false
     }
     return $ReturnValue
 }
