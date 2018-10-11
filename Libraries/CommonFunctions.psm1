@@ -1887,6 +1887,11 @@ Function DoTestCleanUp($CurrentTestResult, $testName, $DeployedServices, $Resour
 							if($group -eq $vmData.HyperVGroupName)
 							{
 								$isCleaned = DeleteHyperVGroup -HyperVGroupName $group -HyperVHost $vmData.HyperVHost
+								if (Get-Variable 'DependencyVmHost' -Scope 'Global' -EA 'Ig') {
+									if ($DependencyVmHost -ne $vmData.HyperVHost) {
+										DeleteHyperVGroup -HyperVGroupName $group -HyperVHost $DependencyVmHost
+									}
+								}
 							}
 						}
 					}
@@ -1955,6 +1960,11 @@ Function DoTestCleanUp($CurrentTestResult, $testName, $DeployedServices, $Resour
 											if($group -eq $vmData.HyperVGroupName)
 											{
 												$isCleaned = DeleteHyperVGroup -HyperVGroupName $group -HyperVHost $vmData.HyperVHost
+												if (Get-Variable 'DependencyVmHost' -Scope 'Global' -EA 'Ig') {
+													if ($DependencyVmHost -ne $vmData.HyperVHost) {
+														DeleteHyperVGroup -HyperVGroupName $group -HyperVHost $DependencyVmHost
+													}
+												}
 											}
 										}
 									}

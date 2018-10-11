@@ -129,12 +129,22 @@ Function CreateAllHyperVGroupDeployments($setupType, $xmlConfig, $Distro, $Debug
         $index = 0
         foreach ($HyperVGroupXML in $setupTypeData.ResourceGroup )
         {
-            $HyperVHost = $xmlConfig.config.HyperV.Hosts.ChildNodes[$index].ServerName
+            $deployOnDifferentHosts = $HyperVGroupXML.VirtualMachine.DeployOnDifferentHyperVHost
+            $HyperVHostArray = @()
+            if ($deployOnDifferentHosts -eq "yes") {
+                foreach ($HypervHost in $xmlConfig.config.HyperV.Hosts.ChildNodes) {
+                    $HyperVHostArray += $HyperVHost.ServerName
+                }
+            } else {
+                $HyperVHostArray += $xmlConfig.config.HyperV.Hosts.ChildNodes[$index].ServerName
+            }
+
             $SourceOsVHDPath = $xmlConfig.config.HyperV.Hosts.ChildNodes[$index].SourceOsVHDPath
             $DestinationOsVHDPath = $xmlConfig.config.HyperV.Hosts.ChildNodes[$index].DestinationOsVHDPath
             $index++
             $validateStartTime = Get-Date
             $readyToDeploy = $false
+            
             while (!$readyToDeploy)
             {
                 #TBD Verify the readiness of the HyperV Host.
@@ -164,18 +174,22 @@ Function CreateAllHyperVGroupDeployments($setupType, $xmlConfig, $Distro, $Debug
                     {
                         LogMsg "Creating HyperV Group : $HyperVGroupName."
                         LogMsg "Verifying that HyperV Group name is not in use."
-                        $isHyperVGroupDeleted = DeleteHyperVGroup -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
+                        foreach ($HyperVHost in $HyperVHostArray){
+                            $isHyperVGroupDeleted = DeleteHyperVGroup -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
+                        }
                     }
                     if ($isHyperVGroupDeleted)
                     {
-                        $CreatedHyperVGroup = CreateHyperVGroup -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
+                        foreach ($HyperVHost in $HyperVHostArray){
+                            $CreatedHyperVGroup = CreateHyperVGroup -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
+                        }
                         if ($CreatedHyperVGroup)
                         {
                             $DeploymentStartTime = (Get-Date)
                             $ExpectedVMs = 0
                             $HyperVGroupXML.VirtualMachine | ForEach-Object {$ExpectedVMs += 1}
                             $VMCreationStatus = CreateHyperVGroupDeployment -HyperVGroupName $HyperVGroupName -HyperVGroupXML $HyperVGroupXML `
-                                -HyperVHost $HyperVHost -SourceOsVHDPath $SourceOsVHDPath -DestinationOsVHDPath $DestinationOsVHDPath `
+                                -HyperVHost $HyperVHostArray -SourceOsVHDPath $SourceOsVHDPath -DestinationOsVHDPath $DestinationOsVHDPath `
                                 -VMGeneration $VMGeneration
                             $DeploymentEndTime = (Get-Date)
                             $DeploymentElapsedTime = $DeploymentEndTime - $DeploymentStartTime
@@ -186,21 +200,22 @@ Function CreateAllHyperVGroupDeployments($setupType, $xmlConfig, $Distro, $Debug
                                     LogMsg "Test Platform is $TestPlatform and Test Area is $TestArea, need to enable nested virtualization"
                                     $status = EnableHyperVNestedVirtualization -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
                                 }
-                                $StartVMStatus = StartHyperVGroupVMs -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
-
-                                if ($StartVMStatus)
-                                {
-                                    $retValue = "True"
-                                    $isHyperVGroupDeployed = "True"
-                                    $HyperVGroupCount = $HyperVGroupCount + 1
-                                    $DeployedHyperVGroup += $HyperVGroupName
-                                }
-                                else 
-                                {
-                                    LogErr "Unable to start one or more VM's"
-                                    $retryDeployment = $retryDeployment + 1
-                                    $retValue = "False"
-                                    $isHyperVGroupDeployed = "False"
+                                foreach ($HyperVHost in $HyperVHostArray){
+                                    $StartVMStatus = StartHyperVGroupVMs -HyperVGroupName $HyperVGroupName -HyperVHost $HyperVHost
+                                    if ($StartVMStatus)
+                                    {
+                                        $retValue = "True"
+                                        $isHyperVGroupDeployed = "True"
+                                        $HyperVGroupCount = $HyperVGroupCount + 1
+                                        $DeployedHyperVGroup += $HyperVGroupName
+                                    }
+                                    else 
+                                    {
+                                        LogErr "Unable to start one or more VM's"
+                                        $retryDeployment = $retryDeployment + 1
+                                        $retValue = "False"
+                                        $isHyperVGroupDeployed = "False"
+                                    }
                                 }
                             }
                             else
@@ -312,16 +327,23 @@ Function CreateHyperVGroupDeployment([string]$HyperVGroup, $HyperVGroupNameXML, 
     $HyperVMappedSizes = [xml](Get-Content .\XML\AzureVMSizeToHyperVMapping.xml)
     $CreatedVMs =  @()
     $OsVHD = $BaseOsVHD
-    $InterfaceAliasWithInternet = (Get-NetIPConfiguration -ComputerName $HyperVHost | where {$_.NetProfile.Name -ne 'Unidentified network'}).InterfaceAlias
-    $VMSwitches = Get-VMSwitch | where {$InterfaceAliasWithInternet -match $_.Name}
     $ErrorCount = 0
     $i = 0
+    $HyperVHost = $HyperVHost | Select-Object -First 1
     $CurrentHyperVGroup = Get-VMGroup -Name $HyperVGroupName -ComputerName $HyperVHost
     if ( $CurrentHyperVGroup.Count -eq 1)
     {
         foreach ( $VirtualMachine in $HyperVGroupXML.VirtualMachine)
         {
+            if ($VirtualMachine.DeployOnDifferentHyperVHost -and ($TestLocation -match ",")) {
+                $hostNumber = $HyperVGroupXML.VirtualMachine.indexOf($VirtualMachine)
+                $HyperVHost = $xmlConfig.config.HyperV.Hosts.ChildNodes[$hostNumber].ServerName
+                $SourceOsVHDPath = $xmlConfig.config.HyperV.Hosts.ChildNodes[$hostNumber].SourceOsVHDPath
+                $DestinationOsVHDPath = $xmlConfig.config.HyperV.Hosts.ChildNodes[$hostNumber].DestinationOsVHDPath
+            }
             $vhdSuffix = [System.IO.Path]::GetExtension($OsVHD)
+            $InterfaceAliasWithInternet = (Get-NetIPConfiguration -ComputerName $HyperVHost | where {$_.NetProfile.Name -ne 'Unidentified network'}).InterfaceAlias
+            $VMSwitches = Get-VMSwitch | where {$InterfaceAliasWithInternet -match $_.Name} | Select-Object -First 1
             if ( $VirtualMachine.RoleName)
             {
                 if ($VirtualMachine.RoleName -match "dependency") {
@@ -342,7 +364,7 @@ Function CreateHyperVGroupDeployment([string]$HyperVGroup, $HyperVGroupNameXML, 
             if ($SourceOsVHDPath) {
                 $parentOsVHDPath = Join-Path $SourceOsVHDPath $OsVHD
             }
-            $infoParentOsVHD = Get-VHD $parentOsVHDPath
+            $infoParentOsVHD = Get-VHD $parentOsVHDPath -ComputerName $HyperVHost
             $uriParentOsVHDPath = [System.Uri]$parentOsVHDPath
             if ($uriParentOsVHDPath -and $uriParentOsVHDPath.isUnc) {
                 LogMsg "Parent VHD path ${parentOsVHDPath} is on an SMB share."
