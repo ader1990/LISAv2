@@ -1159,4 +1159,21 @@
         <Area>STORAGE</Area>
         <Tags>storage</Tags>
     </test>
+    <test>
+        <testName>STORAGE-VHDX-SCSI-DYNAMIC-WGET-LOCAL-COPY-FILE</testName>
+        <setupScript>.\TestScripts\Windows\AddVhdxHardDisk.ps1</setupScript>
+        <testScript>STOR-Large-Disk-CopyFile.sh</testScript>
+        <files>.\Testscripts\Linux\STOR-Large-Disk-CopyFile.sh,.\Testscripts\Linux\utils.sh,.\Testscripts\Linux\check_traces.sh</files>
+        <setupType>SingleVM</setupType>
+        <TestParameters>
+             <param>SCSI=1,1,Dynamic,512,6GB</param>
+             <param>fileSystems=(ext4)</param>
+             <!--URL to test file to download-->
+             <param>wget_path=http://cloud.centos.org/centos/7/images/CentOS-7-x86_64-Azure-1703.qcow2</param>
+        </TestParameters>
+        <Platform>HyperV</Platform>
+        <Category>Functional</Category>
+        <Area>STORAGE</Area>
+        <Tags>storage</Tags>
+    </test>
 </TestCases>
