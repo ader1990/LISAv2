@@ -4285,3 +4285,103 @@ Function Remove-InvalidCharactersFromFileName
     $Regex = "[{0}]" -f [RegEx]::Escape($WindowsInvalidCharacters)
     return ($FileName -replace $Regex)
 }
+
+function Get-KVPItem {
+    param (
+        $VMName,
+        $server,
+        $keyName,
+        $Intrinsic
+    )
+
+    $vm = Get-WmiObject -Namespace root\virtualization\v2 -Query "Select * From Msvm_ComputerSystem Where ElementName=`'$VMName`'"
+    if (-not $vm)
+    {
+        return $Null
+    }
+
+    $kvpEc = Get-WmiObject -Namespace root\virtualization\v2 -Query "Associators of {$vm} Where AssocClass=Msvm_SystemDevice ResultClass=Msvm_KvpExchangeComponent"
+    if (-not $kvpEc)
+    {
+        return $Null
+    }
+
+    $kvpData = $Null
+
+    if ($Intrinsic)
+    {
+        $kvpData = $KvpEc.GuestIntrinsicExchangeItems
+    }else{
+        $kvpData = $KvpEc.GuestExchangeItems
+    }
+
+    if ($kvpData -eq $Null)
+    {
+        return $Null
+    }
+
+    foreach ($dataItem in $kvpData)
+    {
+        $key = $null
+        $value = $null
+        $xmlData = [Xml] $dataItem
+
+        foreach ($p in $xmlData.INSTANCE.PROPERTY)
+        {
+            if ($p.Name -eq "Name")
+            {
+                $key = $p.Value
+            }
+
+            if ($p.Name -eq "Data")
+            {
+                $value = $p.Value
+            }
+        }
+        if ($key -eq $keyName)
+        {
+            return $value
+        }
+    }
+
+    return $Null
+}
+
+function Add-RemoveMaxNIC {
+    param(
+    $vmName,
+    $hvServer,
+    $switchName,
+    $actionType,
+    [int] $nicsAmount
+    )
+    for ($i=1; $i -le $nicsAmount; $i++)
+    {
+    $nicName = "External" + $i
+
+    if ($actionType -eq "add")
+    {
+        LogMsg "Ensure the VM does not have a Synthetic NIC with the name '${nicName}'"
+        $nics = Get-VMNetworkAdapter -vmName $vmName -Name "${nicName}" -ComputerName $hvServer -ErrorAction SilentlyContinue
+        if ($?)
+        {
+        LogErr "VM '${vmName}' already has a NIC named '${nicName}'"
+        }
+    }
+
+    LogMsg "Hot '${actionType}' a synthetic NIC with name of '${nicName}' using switch '${switchName}'"
+    LogMsg "Hot '${actionType}' '${switchName}' to '${vmName}'"
+    if ($actionType -eq "add")
+    {
+        Add-VMNetworkAdapter -VMName $vmName -SwitchName $switchName -ComputerName $hvServer -Name ${nicName} #-ErrorAction SilentlyContinue
+    }
+    else
+    {
+        Remove-VMNetworkAdapter -VMName $vmName -Name "${nicName}" -ComputerName $hvServer -ErrorAction SilentlyContinue
+    }
+    if (-not $?)
+    {
+        LogErr "Unable to Hot '${actionType}' NIC to VM '${vmName}' on server '${hvServer}'"
+        }
+    }
+}
