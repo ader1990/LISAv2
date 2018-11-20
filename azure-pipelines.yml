@@ -50,7 +50,7 @@ jobs:
     - task: UsePythonVersion@0
     - powershell:
         python -m pip install --upgrade flake8;
-        flake8 --select=W291,F841,F401;
+        flake8 --select=W291,F841,F401,H306;
         if ($LASTEXITCODE) {
             echo "Flake8 style errors have been found."
             exit 1;
