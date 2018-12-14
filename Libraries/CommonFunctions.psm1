@@ -2725,6 +2725,7 @@ function Convert-StringToUInt64{
 
 function Check-Result{
 	param(
+		[String] $User,
 		[String] $vmPassword,
 		[String] $vmPort,
 		[String] $ipv4
@@ -2739,7 +2740,7 @@ function Check-Result{
 
 	while ($timeout -ne 0 )
 	{
-		Write-Output "yes" | .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort} root@${ipv4}:${stateFile} ${localStateFile} #| out-null
+		Write-Output "yes" | .\tools\pscp.exe  -v -2 -unsafe -pw $vmPassword -q -P ${vmPort}  ${User}@${ipv4}:${stateFile} ${localStateFile} #| out-null
 		$sts = $?
 		if ($sts)
 		{
