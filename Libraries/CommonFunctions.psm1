@@ -896,7 +896,7 @@ Function Test-TCP($testIP, $testport)
 	return $isConnected
 }
 
-Function Copy-RemoteFiles($uploadTo, $downloadFrom, $downloadTo, $port, $files, $username, $password, [switch]$upload, [switch]$download, [switch]$usePrivateKey, [switch]$doNotCompress, $maxRetry=20) #Removed XML config
+Function Copy-RemoteFiles($uploadTo, $downloadFrom, $downloadTo, $port, $files, $username, $password, [switch]$upload, [switch]$download, [switch]$usePrivateKey, [switch]$doNotCompress, $maxRetry=20, $maxRetryDownload=50, $maxRetryUpload=10) #Removed XML config
 {
 	$retry=1
 	if($upload)
@@ -944,7 +944,7 @@ Function Copy-RemoteFiles($uploadTo, $downloadFrom, $downloadTo, $port, $files, 
 				if ( $CompressCount -eq $fileCounter )
 				{
 					$retry=1
-					$maxRetry=10
+					$maxRetry = $maxRetryUpload
 					while($retry -le $maxRetry)
 					{
 						if($usePrivateKey)
@@ -1025,7 +1025,7 @@ Function Copy-RemoteFiles($uploadTo, $downloadFrom, $downloadTo, $port, $files, 
 						continue
 					}
 					$retry=1
-					$maxRetry=10
+					$maxRetry = $maxRetryUpload
 					$testFile = $f.trim()
 					while($retry -le $maxRetry)
 					{
@@ -1097,7 +1097,7 @@ Function Copy-RemoteFiles($uploadTo, $downloadFrom, $downloadTo, $port, $files, 
 			foreach ($f in $files)
 			{
 				$retry=1
-				$maxRetry=50
+				$maxRetry = $maxRetryDownload
 				$testFile = $f.trim()
 				while($retry -le $maxRetry)
 				{
@@ -1418,7 +1418,8 @@ Function Run-LinuxCmd([string] $username,[string] $password,[string] $ip,[string
 				if($timeOut)
 				{
 					$retValue = ""
-					Throw "Calling function - $($MyInvocation.MyCommand). Tmeout while executing command : $command"
+					$ErrorActionPreference = "Stop"
+					Throw "Calling function - $($MyInvocation.MyCommand). Timeout while executing command: $command"
 				}
 				Write-LogErr "Linux machine returned exit code : $($LinuxExitCode.Split("-")[4])"
 				if ($attempts -eq $maxRetryCount)
@@ -1539,7 +1540,7 @@ Function Run-LinuxCmd([string] $username,[string] $password,[string] $ip,[string
 					if($timeOut)
 					{
 						$retValue = ""
-						Write-LogErr "Tmeout while executing command : $command"
+						throw "Timeout while executing command: $command"
 					}
 					Write-LogErr "Linux machine returned exit code : $($LinuxExitCode.Split("-")[4])"
 					if ($attemptswt -eq $maxRetryCount -and $attemptswot -eq $maxRetryCount)

@@ -55,6 +55,41 @@ if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx "$rx" tx "$tx"; then
     SetTestStateFailed
     exit 0
 fi
+ping -c 4 google.com
+if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx $(expr "$rx" + 1) tx $(expr "$tx" + 1); then
+    LogMsg "Cannot change RX and TX values."
+    SetTestStateFailed
+    exit 0
+fi
+ping -c 4 google.com
+if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx $(expr "$rx" + 2) tx $(expr "$tx" + 2); then
+    LogMsg "Cannot change RX and TX values."
+    SetTestStateFailed
+    exit 0
+fi
+ping -c 4 google.com
+if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx $(expr "$rx" + 3) tx $(expr "$tx" + 3); then
+    LogMsg "Cannot change RX and TX values."
+    SetTestStateFailed
+    exit 0
+fi
+ping -c 4 google.com
+if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx $(expr "$rx" + 4) tx $(expr "$tx" + 4); then
+    LogMsg "Cannot change RX and TX values."
+    SetTestStateFailed
+    exit 0
+fi
+ping -c 4 google.com
+if ! ethtool -G "${SYNTH_NET_INTERFACES[@]}" rx "$rx" tx "$tx"; then
+    LogMsg "Cannot change RX and TX values."
+    SetTestStateFailed
+    exit 0
+fi
+ping -c 4 google.com
+
+ip link set dev "${SYNTH_NET_INTERFACES[@]}" mtu 1400
+ip link set dev "${SYNTH_NET_INTERFACES[@]}" mtu 1300
+ip link set dev "${SYNTH_NET_INTERFACES[@]}" mtu 1200
 
 # Take the values after changes
 new_sts=$(ethtool -g "${SYNTH_NET_INTERFACES[$__iterator]}" 2>&1)

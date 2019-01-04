@@ -920,7 +920,7 @@ function Collect-TestLogs {
             -f @("/home/${Username}")
         Copy-RemoteFiles -download -downloadFrom $PublicIP -downloadTo $LogsDestination `
              -Port $SSHPort -Username "root" -password $Password `
-             -files $filesTocopy
+             -files $filesTocopy -maxRetryDownload 5
         $summary = Get-Content (Join-Path $LogDir "summary.log")
         $testState = Get-Content (Join-Path $LogDir "state.txt")
         $testResult = $resultTranslation[$testState]
