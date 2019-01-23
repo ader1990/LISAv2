@@ -128,7 +128,8 @@ function install_dpdk () {
 
 	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir && make config O=$DPDK_BUILD T=$DPDK_BUILD"
 	LogMsg "Starting DPDK build make on ${1}"
-	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir/$DPDK_BUILD && make -j8 && make install"
+	proc_nr=$(cat /proc/cpuinfo | grep vendor | wc -l)
+	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir/$DPDK_BUILD && make -j${proc_nr} && make install"
 	check_exit_status "dpdk build on ${1}"
 	LogMsg "*********INFO: Installed DPDK version on ${1} is ${dpdkVersion} ********"
 }
