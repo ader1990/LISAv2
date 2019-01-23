@@ -118,9 +118,14 @@ function install_dpdk () {
 	else
 		LogMsg "dpdk build with default DST IP ADDR on ${1}"
 	fi	
-	LogMsg "MLX_PMD flag enabling on ${1}"
-	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_MLX4_PMD=n/CONFIG_RTE_LIBRTE_MLX4_PMD=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
-	check_exit_status "${1} CONFIG_RTE_LIBRTE_MLX4_PMD=y"
+	LogMsg "CONFIG_RTE_LIBRTE_MLX._PMD enable ${1}"
+	ssh "${1}" "sed -ri 's,(MLX._PMD=)n,\1y,' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_MLX._PMD=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=n/CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y"
+
 	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir && make config O=$DPDK_BUILD T=$DPDK_BUILD"
 	LogMsg "Starting DPDK build make on ${1}"
 	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir/$DPDK_BUILD && make -j8 && make install"
