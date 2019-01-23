@@ -77,10 +77,10 @@ function install_dpdk () {
 		dpdkSrcTar="${dpdkSrcLink##*/}"
 		dpdkVersion=$(echo "$dpdkSrcTar" | grep -Po "(\d+\.)+\d+")
 		LogMsg "Installing DPDK from source file $dpdkSrcTar"
-		ssh "${1}" "wget $dpdkSrcLink -P /tmp"
-		ssh "${1}" "tar xf /tmp/$dpdkSrcTar"
-		check_exit_status "tar xf /tmp/$dpdkSrcTar on ${1}"
 		dpdkSrcDir="${dpdkSrcTar%%".tar"*}"
+		ssh "${1}" "wget $dpdkSrcLink -P /tmp"
+		ssh "${1}" "mkdir ./${dpdkSrcDir}-bak && tar xf /tmp/$dpdkSrcTar -C ./${dpdkSrcDir}-bak && mv ./${dpdkSrcDir}-bak/* ./${dpdkSrcDir} && rm -rf ./${dpdkSrcDir}-bak"
+		check_exit_status "tar xf /tmp/$dpdkSrcTar on ${1}"
 		LogMsg "dpdk source on ${1} $dpdkSrcDir"
 	elif [[ $dpdkSrcLink =~ ".git" ]] || [[ $dpdkSrcLink =~ "git:" ]];
 	then
