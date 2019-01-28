@@ -126,6 +126,30 @@ function install_dpdk () {
 	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=n/CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
 	check_exit_status "${1} CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y"
 
+	LogMsg "CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=n/CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_NETVSC_PMD flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_NETVSC_PMD=n/CONFIG_RTE_LIBRTE_NETVSC_PMD=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_NETVSC_PMD=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_VMBUS flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_VMBUS=n/CONFIG_RTE_LIBRTE_VMBUS=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_VMBUS=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_PMD_TAP flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_PMD_TAP=n/CONFIG_RTE_LIBRTE_PMD_TAP=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_PMD_TAP=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_PMD_AF_PACKET flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_PMD_AF_PACKET=n/CONFIG_RTE_LIBRTE_PMD_AF_PACKET=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_PMD_AF_PACKET=y"
+
+	LogMsg "CONFIG_RTE_PROC_INFO flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_PROC_INFO=n/CONFIG_RTE_PROC_INFO=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_PROC_INFO=y"
+
 	LogMsg "CONFIG_RTE_IBVERBS_LINK_DLOPEN flag enable on ${1}"
 	ssh "${1}" "sed -i 's/^CONFIG_RTE_IBVERBS_LINK_DLOPEN=n/CONFIG_RTE_IBVERBS_LINK_DLOPEN=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
 	check_exit_status "${1} CONFIG_RTE_IBVERBS_LINK_DLOPEN=y"
