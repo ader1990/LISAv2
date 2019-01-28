@@ -145,7 +145,7 @@ function install_dpdk () {
 	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir && make config O=$DPDK_BUILD T=$DPDK_BUILD"
 	LogMsg "Starting DPDK build make on ${1}"
 	proc_nr=$(cat /proc/cpuinfo | grep vendor | wc -l)
-	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir/$DPDK_BUILD && make -j${proc_nr} && make install"
+	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir/$DPDK_BUILD && make -j${proc_nr} && make install && cp ./lib/librte_pmd_mlx* /usr/lib/x86_64-linux-gnu/"
 	check_exit_status "dpdk build on ${1}"
 	LogMsg "*********INFO: Installed DPDK version on ${1} is ${dpdkVersion} ********"
 }
