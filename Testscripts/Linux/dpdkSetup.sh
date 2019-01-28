@@ -134,6 +134,14 @@ function install_dpdk () {
 	ssh "${1}" "sed -i 's/^CONFIG_RTE_IBVERBS_LINK_STATIC=n/CONFIG_RTE_IBVERBS_LINK_STATIC=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
 	check_exit_status "${1} CONFIG_RTE_IBVERBS_LINK_STATIC=y"
 
+	LogMsg "CONFIG_RTE_LIBRTE_MLX4_DLOPEN_DEPS flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_MLX4_DLOPEN_DEPS=n/CONFIG_RTE_LIBRTE_MLX4_DLOPEN_DEPS=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_MLX4_DLOPEN_DEPS=y"
+
+	LogMsg "CONFIG_RTE_LIBRTE_MLX5_DLOPEN_DEPS flag enable on ${1}"
+	ssh "${1}" "sed -i 's/^CONFIG_RTE_LIBRTE_MLX5_DLOPEN_DEPS=n/CONFIG_RTE_LIBRTE_MLX5_DLOPEN_DEPS=y/g' $HOMEDIR/$dpdkSrcDir/config/common_base"
+	check_exit_status "${1} CONFIG_RTE_LIBRTE_MLX5_DLOPEN_DEPS=y"
+
 	ssh "${1}" "cd $HOMEDIR/$dpdkSrcDir && make config O=$DPDK_BUILD T=$DPDK_BUILD"
 	LogMsg "Starting DPDK build make on ${1}"
 	proc_nr=$(cat /proc/cpuinfo | grep vendor | wc -l)
