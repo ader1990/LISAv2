@@ -175,19 +175,21 @@ Class HyperVProvider : TestProvider
 
 	[void] DeleteTestVMs($allVMData, $SetupTypeData, $UseExistingRG) {
 		foreach ($vmData in $AllVMData) {
-			$isCleaned = Delete-HyperVGroup -HyperVGroupName $vmData.HyperVGroupName -HyperVHost $vmData.HyperVHost -SetupTypeData $SetupTypeData -UseExistingRG $UseExistingRG
+			$isCleaned = Delete-HyperVGroup -HyperVGroupName $vmData.HyperVGroupName `
+				-HyperVHost $vmData.HyperVHost -SetupTypeData $SetupTypeData -UseExistingRG $UseExistingRG
 			if (Get-Variable 'DependencyVmHost' -Scope 'Global' -EA 'Ig') {
 				if ($global:DependencyVmHost -ne $vmData.HyperVHost) {
-					Delete-HyperVGroup -HyperVGroupName $vmData.HyperVGroupName -HyperVHost $global:DependencyVmHost -SetupTypeData $SetupTypeData -UseExistingRG $UseExistingRG
+					$isDepCleaned = Delete-HyperVGroup -HyperVGroupName $vmData.HyperVGroupName `
+						-HyperVHost $global:DependencyVmHost -SetupTypeData $SetupTypeData `
+						-UseExistingRG $UseExistingRG
+					$isCleaned = $isCleaned -and $isDepCleaned
 				}
 			}
-			if (!$isCleaned)
-			{
-				Write-LogInfo "Failed to delete HyperV group $($vmData.HyperVGroupName).. Please delete it manually."
-			}
-			elseif (!$UseExistingRG)
-			{
-				Write-LogInfo "Successfully delete HyperV group $($vmData.HyperVGroupName).."
+
+			if (!$isCleaned) {
+				Write-LogInfo "Failed to delete HyperV group $($vmData.HyperVGroupName). Please delete it manually."
+			} elseif (!$UseExistingRG) {
+				Write-LogInfo "Successfully delete HyperV group $($vmData.HyperVGroupName)."
 			}
 		}
 	}
