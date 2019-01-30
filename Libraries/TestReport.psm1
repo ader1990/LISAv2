@@ -120,7 +120,6 @@ Class JUnitReportGenerator
 {
 	[string] $JunitReportPath
 	[Xml] $JunitReport
-	[System.Xml.XmlElement] $ReportRootNode
 	[object] $TestSuiteLogTable
 	[object] $TestSuiteCaseLogTable
 
@@ -128,8 +127,6 @@ Class JUnitReportGenerator
 	{
 		$this.JunitReportPath = $ReportPath
 		$this.JunitReport = New-Object System.Xml.XmlDocument
-		$newElement = $this.JunitReport.CreateElement("testsuites")
-		$this.ReportRootNode = $this.JunitReport.AppendChild($newElement)
 		$this.TestSuiteLogTable = @{}
 		$this.TestSuiteCaseLogTable = @{}
 	}
@@ -155,7 +152,7 @@ Class JUnitReportGenerator
 		$newElement.SetAttribute("failures", 0)
 		$newElement.SetAttribute("errors", 0)
 		$newElement.SetAttribute("time", 0)
-		$testsuiteNode = $this.ReportRootNode.AppendChild($newElement)
+		$testsuiteNode = $this.JunitReport.AppendChild($newElement)
 
 		$testsuite = [ReportNode]::New($testsuiteNode)
 
