@@ -192,11 +192,17 @@ Class TestController
 
 		$SetupTypes = $allTests.setupType | Sort-Object | Get-Unique
 
-		foreach ( $file in $SetupTypeXMLs.FullName)	{
-			foreach ( $SetupType in $SetupTypes ) {
-				$CurrentSetupType = ([xml]( Get-Content -Path $file)).TestSetup
+		foreach ($file in $SetupTypeXMLs.FullName) {
+			foreach ($SetupType in $SetupTypes ) {
+				Write-LogInfo ">>> SETUP_TYPE is ${setupType}"
+				Write-LogInfo ">>> FILE is ${file}"
+				$CurrentSetupType = ([xml](Get-Content -Path $file)).TestSetup
 				if ($CurrentSetupType.$SetupType) {
+					Write-LogInfo ">>> SETUP_TYPE is present in this file"
+					# $this.SetupTypeTable[$SetupType] = $CurrentSetupType.$SetupType
 					$this.SetupTypeTable.Add($SetupType, $CurrentSetupType.$SetupType)
+				} else {
+					Write-LogInfo ">>> SETUP_TYPE is not present in this file"
 				}
 			}
 		}
