@@ -52,7 +52,7 @@ function install_dpdk () {
 				ssh "${1}" "add-apt-repository ppa:canonical-server/dpdk-azure -y"
 			fi
 			ssh "${1}" ". ${UTIL_FILE} && update_repos"
-			packages+=(librdmacm-dev librdmacm1 build-essential libnuma-dev libelf-dev)
+			packages+=(librdmacm-dev librdmacm1 build-essential libnuma-dev libelf-dev libmnl-dev rdma-core libibverbs-dev)
 			;;
 		suse|opensuse|sles)
 			ssh "${1}" ". ${UTIL_FILE} && add_sles_network_utilities_repo"
