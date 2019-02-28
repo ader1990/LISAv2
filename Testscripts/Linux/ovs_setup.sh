@@ -86,6 +86,9 @@ function install_ovs () {
 	ssh "${1}" "cd ${OVS_DIR} && make -j16 && make install"
 	check_exit_status "ovs build on ${1}"
 
+	ssh "${1}" "ip addr flush dev ${nicName}"
+	check_exit_status "${nicName} flush on ${1}"
+
 	ssh "${1}" "/usr/share/openvswitch/scripts/ovs-ctl start"
 	check_exit_status "ovs start on ${1}"
 
@@ -97,7 +100,8 @@ function install_ovs () {
 	ssh "${1}" "ovs-vsctl add-br "${OVS_BRIDGE}" -- set bridge "${OVS_BRIDGE}" datapath_type=netdev"
 	check_exit_status "ovs bridge ${OVS_BRIDGE} create on ${1}"
 
-	ssh "${1}" "ovs-vsctl add-port "${OVS_BRIDGE}" p1 -- set Interface p1 type=dpdk options:dpdk-devargs=net_tap_vsc0,iface=eth1"
+	ssh "${1}" "ovs-vsctl add-port "${OVS_BRIDGE}" p1 -- set Interface p1 type=dpdk options:dpdk-devargs=net_tap_vsc0,iface=${nicName}"
+	check_exit_status "ovs port added to bridge ${OVS_BRIDGE} on ${1}"
 
 	LogMsg "*********INFO: Installed OVS version on ${1} is ${ovsVersion} ********"
 }
