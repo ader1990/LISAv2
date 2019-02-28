@@ -92,47 +92,61 @@ function Main {
 		Write-LogInfo (Get-Content -Path $constantsFile)
 		#endregion
 
-		#region EXECUTE TEST
-		$myString = @"
+		#region INSTALL CONFIGURE DPDK
+		$install_configure_dpdk = @"
 cd /root/
 ./dpdk_ovs_setup.sh 2>&1 > dpdkConsoleLogs.txt
 . utils.sh
 collect_VM_properties
 "@
-		Set-Content "$LogDir\StartDpdkOvsSetup.sh" $myString
-		Copy-RemoteFiles -uploadTo $clientVMData.PublicIP -port $clientVMData.SSHPort -files "$constantsFile,$LogDir\StartDpdkOvsSetup.sh" -username $superUser -password $password -upload
+		Set-Content "$LogDir\StartDpdkOvsSetup.sh" $install_configure_dpdk
+		Copy-RemoteFiles -uploadTo $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-files "$constantsFile,$LogDir\StartDpdkOvsSetup.sh" -username $superUser -password $password -upload
 
-		Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -command "chmod +x *.sh" | Out-Null
-		$testJob = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -command "./StartDpdkOvsSetup.sh" -RunInBackground
+		Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "chmod +x *.sh" | Out-Null
+		$testJob = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "./StartDpdkOvsSetup.sh" -RunInBackground
 		#endregion
 
-		#region MONITOR TEST
+		#region MONITOR INSTALL CONFIGURE DPDK
 		while ((Get-Job -Id $testJob).State -eq "Running") {
-			$currentStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -command "tail -2 dpdkConsoleLogs.txt | head -1"
+			$currentStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+				-username $superUser -password $password -command "tail -2 dpdkConsoleLogs.txt | head -1"
 			Write-LogInfo "Current Test Status : $currentStatus"
 			Wait-Time -seconds 20
 		}
-		$finalStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -command "cat /root/state.txt"
-		Copy-RemoteFiles -downloadFrom $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -download -downloadTo $LogDir -files "*.csv, *.txt, *.log"
+		$dpdkStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "cat /root/state.txt"
 
-		if ($finalStatus -imatch "TestFailed") {
-			Write-LogErr "Test failed. Last known status : $currentStatus."
-			$testResult = "FAIL"
+		#region INSTALL CONFIGURE OVS
+		$install_configure_ovs = @"
+cd /root/
+./ovs_setup.sh 2>&1 > ovsConsoleLogs.txt
+. utils.sh
+collect_VM_properties
+"@
+		Set-Content "$LogDir\StartOvsSetup.sh" $install_configure_ovs
+		Copy-RemoteFiles -uploadTo $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-files "$constantsFile,$LogDir\StartOvsSetup.sh" -username $superUser -password $password -upload
+
+		Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "chmod +x *.sh" | Out-Null
+		$testJob = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "./StartOvsSetup.sh" -RunInBackground
+		#endregion
+
+		#region MONITOR INSTALL CONFIGURE OVS
+		while ((Get-Job -Id $testJob).State -eq "Running") {
+			$currentStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+				-username $superUser -password $password -command "tail -2 ovsConsoleLogs.txt | head -1"
+			Write-LogInfo "Current Test Status : $currentStatus"
+			Wait-Time -seconds 20
 		}
-		elseif ($finalStatus -imatch "TestAborted") {
-			Write-LogErr "Test Aborted. Last known status : $currentStatus."
-			$testResult = "ABORTED"
-		}
-		elseif ($finalStatus -imatch "TestCompleted") {
-			Write-LogInfo "Test Completed."
-			$testResult = "PASS"
-			Copy-RemoteFiles -downloadFrom $clientVMData.PublicIP -port $clientVMData.SSHPort -username $superUser -password $password -download -downloadTo $LogDir -files "*.tar.gz"
-		}
-		elseif ($finalStatus -imatch "TestRunning") {
-			Write-LogInfo "Powershell background job for test is completed but VM is reporting that test is still running. Please check $LogDir\dpdkConsoleLogs.txt"
-			Write-LogInfo "Content of summary.log : $testSummary"
-			$testResult = "PASS"
-		}
+		$ovsStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
+			-username $superUser -password $password -command "cat /root/state.txt"
+
+		$testResult = "Pass"
 	} catch {
 		$ErrorMessage =  $_.Exception.Message
 		$ErrorLine = $_.InvocationInfo.ScriptLineNumber
