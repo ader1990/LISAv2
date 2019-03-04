@@ -1,13 +1,33 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the Apache License.
 param([object] $AllVmData,
-	  [object] $CurrentTestData)
+		[object] $CurrentTestData)
+
+function Get-TestStatus {
+	param($testStatus)
+	if ($testStatus -imatch "TestFailed") {
+		Write-LogErr "Test failed. Last known status: $currentStatus."
+		$testResult = "FAIL"
+	}	elseif ($testStatus -imatch "TestAborted") {
+		Write-LogErr "Test Aborted. Last known status : $currentStatus."
+		$testResult = "ABORTED"
+	}	elseif ($testStatus -imatch "TestCompleted") {
+		Write-LogInfo "Test Completed."
+		Write-LogInfo "DPDK build is Success"
+		$testResult = "PASS"
+	}	else {
+		Write-LogErr "Test execution is not successful, check test logs in VM."
+		$testResult = "ABORTED"
+	}
+
+	return $testResult
+}
+
 
 function Main {
 	# Create test result
 	$superUser = "root"
-	$resultArr = @()
-	$currentTestResult = Create-TestResultObject
+	$testResult = $null
 
 	try {
 		$noClient = $true
@@ -118,6 +138,10 @@ collect_VM_properties
 		}
 		$dpdkStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
 			-username $superUser -password $password -command "cat /root/state.txt"
+		$testResult = Get-TestStatus $dpdkStatus
+		if ($testResult -ne "PASS") {
+			return $testResult
+		}
 
 		#region INSTALL CONFIGURE OVS
 		$install_configure_ovs = @"
@@ -145,21 +169,17 @@ collect_VM_properties
 		}
 		$ovsStatus = Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
 			-username $superUser -password $password -command "cat /root/state.txt"
-
-		$testResult = "Pass"
+		$testResult = Get-TestStatus $ovsStatus
+		if ($testResult -ne "PASS") {
+			return $testResult
+		}
 	} catch {
 		$ErrorMessage =  $_.Exception.Message
 		$ErrorLine = $_.InvocationInfo.ScriptLineNumber
 		Write-LogErr "EXCEPTION : $ErrorMessage at line: $ErrorLine"
 		$testResult = "FAIL"
-	} finally {
-		if (!$testResult) {
-			$testResult = "Aborted"
-		}
-		$resultArr += $testResult
 	}
-	$currentTestResult.TestResult = Get-FinalResultHeader -resultarr $resultArr
-	return $currentTestResult
+	return $testResult
 }
 
 Main
