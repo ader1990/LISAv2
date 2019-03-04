@@ -110,5 +110,6 @@ else
 	setup_huge_pages "${server}"
 	LogMsg "INFO: Installing DPDK on server ${server}..."
 	install_dpdk "${server}"
+	SetTestStateCompleted
 fi
 LogMsg "*********INFO: DPDK setup completed*********"

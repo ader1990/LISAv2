@@ -115,5 +115,6 @@ else
 	setup_huge_pages "${server}"
 	LogMsg "INFO: Installing OVS on server ${server}..."
 	install_ovs "${server}"
+	SetTestStateCompleted
 fi
 LogMsg "*********INFO: OVS setup completed*********"
