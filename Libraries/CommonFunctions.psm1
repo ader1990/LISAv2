@@ -1984,6 +1984,8 @@ function IsGreaterKernelVersion() {
                 continue
             } elseif ([int]$actualKernelVersions[$i] -lt [int]$supportKernelVersions[$i]) {
                 return $false
+            } else {
+                return $true
             }
         }
         return $true
