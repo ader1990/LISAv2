@@ -21,17 +21,6 @@ UTIL_FILE="./utils.sh"
 # Source constants file and initialize most common variables
 UtilsInit
 
-function setup_huge_pages () {
-	LogMsg "Huge page setup is running"
-	ssh "${1}" "mkdir -p /mnt/huge && mkdir -p /mnt/huge-1G"
-	ssh "${1}" "mount -t hugetlbfs nodev /mnt/huge && mount -t hugetlbfs nodev /mnt/huge-1G -o 'pagesize=1G'"
-	check_exit_status "Huge pages are mounted on ${1}"
-	ssh "${1}" "echo 4096 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages"
-	check_exit_status "4KB huge pages are configured on ${1}"
-	ssh "${1}" "echo 8 > /sys/devices/system/node/node0/hugepages/hugepages-1048576kB/nr_hugepages"
-	check_exit_status "1GB huge pages are configured on ${1}"
-}
-
 function install_ovs () {
 	SetTestStateRunning
 	LogMsg "Configuring ${1} ${DISTRO_NAME} ${DISTRO_VERSION} for OVS test..."
@@ -112,10 +101,6 @@ function install_ovs () {
 LogMsg "*********INFO: Script execution Started********"
 echo "server-vm : eth0 : ${server}"
 echo "client-vm : eth0 : ${client}"
-
-LogMsg "*********INFO: Starting Huge page configuration*********"
-LogMsg "INFO: Configuring huge pages on client ${client}..."
-setup_huge_pages "${client}"
 
 LogMsg "*********INFO: Starting setup & configuration of OVS*********"
 LogMsg "INFO: Installing OVS on client ${client}..."

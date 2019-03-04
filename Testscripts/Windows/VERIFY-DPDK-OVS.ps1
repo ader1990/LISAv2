@@ -68,7 +68,6 @@ function Main {
 		Add-Content -Value "server=$($serverVMData.InternalIP)" -Path $constantsFile
 		Add-Content -Value "client=$($clientVMData.InternalIP)" -Path $constantsFile
 		Add-Content -Value "nicName=eth1" -Path $constantsFile
-		Add-Content -Value "pciAddress=0002:00:02.0" -Path $constantsFile
 
 		foreach ($param in $currentTestData.TestParameters.param) {
 			Add-Content -Value "$param" -Path $constantsFile
@@ -77,14 +76,15 @@ function Main {
 			}
 		}
 		$detectedDistro = Detect-LinuxDistro -VIP $vmData.PublicIP -SSHport $vmData.SSHPort `
-				-testVMUser $user -testVMPassword $password
+			-testVMUser $user -testVMPassword $password
 		$currentKernelVersion = Run-LinuxCmd -ip $vmData.PublicIP -port $vmData.SSHPort `
-				-username $user -password $password -command "uname -r"
+			-username $user -password $password -command "uname -r"
 		if (IsGreaterKernelVersion -actualKernelVersion $currentKernelVersion -detectedDistro $detectedDistro) {
-				Write-LogInfo "Confirmed Kernel version supported: $currentKernelVersion"
+			Write-LogInfo "Confirmed Kernel version supported: $currentKernelVersion"
 		} else {
-			Write-LogErr "Unsupported Kernel version: $currentKernelVersion"
-			throw "Unsupported Kernel version: $currentKernelVersion"
+			$msg = "Unsupported Kernel version: $currentKernelVersion"
+			Write-LogErr $msg
+			throw $msg
 		}
 
 		Write-LogInfo "constants.sh created successfully..."
@@ -95,7 +95,7 @@ function Main {
 		#region INSTALL CONFIGURE DPDK
 		$install_configure_dpdk = @"
 cd /root/
-./dpdk_ovs_setup.sh 2>&1 > dpdkConsoleLogs.txt
+./dpdk_generic_setup.sh 2>&1 > dpdkConsoleLogs.txt
 . utils.sh
 collect_VM_properties
 "@
@@ -128,7 +128,7 @@ collect_VM_properties
 "@
 		Set-Content "$LogDir\StartOvsSetup.sh" $install_configure_ovs
 		Copy-RemoteFiles -uploadTo $clientVMData.PublicIP -port $clientVMData.SSHPort `
-			-files "$constantsFile,$LogDir\StartOvsSetup.sh" -username $superUser -password $password -upload
+			-files "$LogDir\StartOvsSetup.sh" -username $superUser -password $password -upload
 
 		Run-LinuxCmd -ip $clientVMData.PublicIP -port $clientVMData.SSHPort `
 			-username $superUser -password $password -command "chmod +x *.sh" | Out-Null
