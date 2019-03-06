@@ -93,6 +93,20 @@ function install_dpdk () {
 		check_exit_status "git clone $dpdkSrcLink on ${1}" "exit"
 		cd "$dpdkSrcDir"
 		LogMsg "dpdk source on ${1} $dpdkSrcDir"
+	elif [[ $dpdkSrcLink =~ "ppa:" ]];
+	then
+		if [[ $DISTRO_NAME != "ubuntu" && $DISTRO_NAME != "debian" ]];
+		then
+			echo "PPAs are supported only on Debian based distros."
+			SetTestStateAborted
+			exit 1
+		fi
+		ssh "${1}" "add-apt-repository ${dpdkSrcLink} -y"
+		ssh "${1}" ". ${UTIL_FILE} && update_repos"
+		ssh "${1}" ". ${UTIL_FILE} && install_package dpdk"
+		check_exit_status "Install DPDK from ppa ${dpdkSrcLink} on ${1}" "exit"
+		LogMsg "*********Installed DPDK on ${1}********"
+		return
 	else
 		LogMsg "Provide proper link $dpdkSrcLink"
 	fi
