@@ -91,6 +91,30 @@ function Set-Phase() {
 	Run-LinuxCmd -ip $masterVM.PublicIP -port $masterVM.SSHPort -username $superUser -password $password -command "echo $phase_msg > phase.txt"
 }
 
+
+function Confirm-WithinPercentage() {
+	param (
+		[double]$num0,
+		[double]$num1,
+		[double]$percent = 10
+	)
+
+	$larger = $num0
+	$smaller = $num1
+	if ($smaller -gt $larger) {
+		$larger = $num1
+		$smaller = $num0
+	}
+
+	$difference = ($larger - $smaller) / $smaller * 100
+
+	if ($difference -gt $percent) {
+		return $false
+	}
+
+	return $true
+}
+
 function Main {
 	Write-LogInfo "DPDK-TESTCASE-DRIVER starting..."
 
