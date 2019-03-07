@@ -103,7 +103,7 @@ function install_dpdk () {
 		fi
 		ssh "${1}" "add-apt-repository ${dpdkSrcLink} -y"
 		ssh "${1}" ". ${UTIL_FILE} && update_repos"
-		ssh "${1}" ". ${UTIL_FILE} && install_package dpdk"
+		ssh "${1}" ". ${UTIL_FILE} && install_package dpdk dpdk-dev"
 		check_exit_status "Install DPDK from ppa ${dpdkSrcLink} on ${1}" "exit"
 		ssh "${1}" "ln -sf /usr/bin/dpdk-testpmd /usr/bin/testpmd"
 		LogMsg "*********Installed DPDK on ${1}********"
