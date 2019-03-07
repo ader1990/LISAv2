@@ -94,16 +94,16 @@ function Set-Phase() {
 
 function Confirm-WithinPercentage() {
 	param (
-		[double]$num0,
-		[double]$num1,
-		[double]$percent = 10
+		$num0,
+		$num1,
+		$percent = 10
 	)
 
-	$larger = $num0
-	$smaller = $num1
+	$larger = [double]$num0
+	$smaller = [double]$num1
 	if ($smaller -gt $larger) {
-		$larger = $num1
-		$smaller = $num0
+		$larger = [double]$num1
+		$smaller = [double]$num0
 	}
 
 	$difference = ($larger - $smaller) / $smaller * 100

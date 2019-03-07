@@ -38,25 +38,25 @@ function Confirm-Performance() {
 		$coreData = Select-Xml -Xml $sizeData -XPath "core$($testRun.core)" | Select-Object -ExpandProperty Node
 		Write-LogInfo "Comparing $($testRun.core) core(s) data"
 		Write-LogInfo "  compare tx pps $($testRun.tx_pps_avg) with lowerbound $($coreData.tx)"
-		if (Confirm-WithinPercentage [int]$testRun.tx_pps_avg [int]$coreData.tx) {
+		if (Confirm-WithinPercentage $testRun.tx_pps_avg $coreData.tx) {
 			Write-LogErr "  Perf Failure; $($testRun.tx_pps_avg) must be > $($coreData.tx)"
 			$tempResult = "FAIL"
 		}
 
 		Write-LogInfo "  compare fwdrx pps $($testRun.fwdrx_pps_avg) with lowerbound $($coreData.fwdrx)"
-		if (Confirm-WithinPercentage [int]$testRun.fwdrx_pps_avg [int]$coreData.fwdrx) {
+		if (Confirm-WithinPercentage $testRun.fwdrx_pps_avg $coreData.fwdrx) {
 			Write-LogErr "  Perf Failure; $($testRun.fwdrx_pps_avg) must be > $($coreData.fwdrx)"
 			$tempResult = "FAIL"
 		}
 
 		Write-LogInfo "  compare fwdtx pps $($testRun.fwdtx_pps_avg) with lowerbound $($coreData.fwdtx)"
-		if (Confirm-WithinPercentage [int]$testRun.fwdtx_pps_avg [int]$coreData.fwdtx) {
+		if (Confirm-WithinPercentage $testRun.fwdtx_pps_avg $coreData.fwdtx) {
 			Write-LogErr "  Perf Failure; $($testRun.fwdtx_pps_avg) must be > $($coreData.fwdtx)"
 			$tempResult = "FAIL"
 		}
 
 		Write-LogInfo "  compare rx pps $($testRun.rx_pps_avg) with lowerbound $($coreData.rx)"
-		if (Confirm-WithinPercentage [int]$testRun.rx_pps_avg [int]$coreData.rx) {
+		if (Confirm-WithinPercentage $testRun.rx_pps_avg $coreData.rx) {
 			Write-LogErr "  Perf Failure; $($testRun.rx_pps_avg) must be > $($coreData.rx)"
 			$tempResult = "FAIL"
 		}
