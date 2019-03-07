@@ -120,7 +120,9 @@ function install_dpdk () {
 		LogMsg "*********Installed DPDK on ${1}********"
 		return
 	else
-		LogMsg "Provide proper link $dpdkSrcLink"
+		LogMsg "DPDK source link not supported: '${dpdkSrcLink}'"
+		SetTestStateAborted
+		exit 1
 	fi
 
 	if [ ! -z "$dpdk_server_ip" -a "$dpdk_server_ip" != " " ];
