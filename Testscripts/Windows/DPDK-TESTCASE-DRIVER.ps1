@@ -91,28 +91,29 @@ function Set-Phase() {
 	Run-LinuxCmd -ip $masterVM.PublicIP -port $masterVM.SSHPort -username $superUser -password $password -command "echo $phase_msg > phase.txt"
 }
 
-
 function Confirm-WithinPercentage() {
 	param (
-		$num0,
-		$num1,
-		$percent = 10
+		[double]$num0,
+		[double]$num1,
+		$percent = 20
 	)
 
-	$larger = [double]$num0
-	$smaller = [double]$num1
-	if ($smaller -gt $larger) {
-		$larger = [double]$num1
-		$smaller = [double]$num0
+	$variation = ($num0 - $num1) / $num1 * 100
+	if ($variation -eq 0) {
+		Write-LogInfo "No variation for the performance."
+		return $true
+	} elseif ($variation -gt 0) {
+		Write-LogInfo "Positive variation ${variation} for the performance."
+		return $true
+	} else {
+		if ($variation -gt $percent) {
+			Write-LogError "Negative variation ${variation} for the performance greater than the threshold ${percent}."
+			return $false
+		} else {
+			Write-LogWarn "Negative variation ${variation} for the performance smaller than the threshold ${percent}."
+			return $true
+		}
 	}
-
-	$difference = ($larger - $smaller) / $smaller * 100
-
-	if ($difference -gt $percent) {
-		return $false
-	}
-
-	return $true
 }
 
 function Main {
