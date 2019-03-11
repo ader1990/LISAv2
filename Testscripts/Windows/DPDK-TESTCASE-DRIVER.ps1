@@ -106,11 +106,11 @@ function Confirm-WithinPercentage() {
 		Write-LogInfo "Positive variation ${variation} for the performance."
 		return $true
 	} else {
-		if ($variation -gt $percent) {
-			Write-LogError "Negative variation ${variation} for the performance greater than the threshold ${percent}."
+		if ($variation -lt $percent) {
+			Write-LogError "Variation ${variation} for the performance smaller than the threshold ${percent}."
 			return $false
 		} else {
-			Write-LogWarn "Negative variation ${variation} for the performance smaller than the threshold ${percent}."
+			Write-LogWarn "Variation ${variation} for the performance greater than the threshold ${percent}."
 			return $true
 		}
 	}
